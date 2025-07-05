@@ -1,4 +1,4 @@
-name: 🚀 Auto Deploy to Sakura Internet
+name: 🚀 Auto Deploy to Sakura Internet (Optimized)
 
 on:
   push:
@@ -9,10 +9,10 @@ on:
       - '.gitignore'
   workflow_dispatch:
     inputs:
-      restart_service:
-        description: 'サービスを再起動しますか？'
-        required: true
-        default: 'yes'
+      full_deploy:
+        description: 'フルデプロイ（依存関係も更新）'
+        required: false
+        default: 'no'
         type: choice
         options:
           - yes
@@ -26,20 +26,9 @@ jobs:
     - name: 📥 Checkout code
       uses: actions/checkout@v3
     
-    - name: 🐍 Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.8'
-    
-    - name: 🧪 Run tests
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest
-        python -m pytest tests/ -v || echo "⚠️ テストをスキップしました"
-    
     - name: 🔧 Install deployment tools
       run: |
-        sudo apt-get update
+        sudo apt-get update -qq
         sudo apt-get install -y sshpass rsync
     
     - name: 🚀 Deploy to Sakura Internet
@@ -54,135 +43,111 @@ jobs:
         
         echo "📁 リモートディレクトリを準備中..."
         sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
-          mkdir -p $REMOTE_PATH
           mkdir -p $REMOTE_PATH/logs
-          mkdir -p /home/mokumoku/backups
         "
         
-        echo "💾 既存アプリケーションをバックアップ中..."
-        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        # APIサーバーが動いていれば停止
+        echo "🛑 既存APIサーバーを停止中..."
         sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
-          if [ -d '$REMOTE_PATH' ] && [ \"\$(ls -A $REMOTE_PATH 2>/dev/null)\" ]; then
-            # サービス停止
-            if [ -f '$REMOTE_PATH/service.pid' ]; then
-              echo '🛑 既存サービスを停止中...'
-              cd $REMOTE_PATH && ./stop_tag_generator.sh || true
+          cd $REMOTE_PATH
+          if [ -f 'api_server.pid' ]; then
+            PID=\$(cat api_server.pid)
+            if ps -p \$PID > /dev/null 2>&1; then
+              kill \$PID || true
+              sleep 2
             fi
-            
-            # バックアップ作成
-            cp -r $REMOTE_PATH /home/mokumoku/backups/tag_generator_$TIMESTAMP
-            echo '✅ バックアップ作成: /home/mokumoku/backups/tag_generator_$TIMESTAMP'
           fi
+          # 古いプロセスも停止
+          pkill -f 'api_server' || true
         "
         
-        echo "📦 ファイルを同期中..."
-        sshpass -p "$REMOTE_PASSWORD" rsync -avz --delete \
+        echo "📦 変更されたファイルのみを同期中..."
+        sshpass -p "$REMOTE_PASSWORD" rsync -avz \
           --exclude=.git \
           --exclude=.env \
+          --exclude=.env.template \
           --exclude=__pycache__ \
           --exclude=*.pyc \
           --exclude=venv \
           --exclude=.DS_Store \
-          --exclude=logs/*.log \
+          --exclude=logs \
           --exclude=.github \
           --exclude='*.bak' \
+          --exclude=backups \
+          --exclude=service.pid \
+          --exclude=api_server.pid \
           -e "ssh -p 22 -o StrictHostKeyChecking=no" \
           ./ "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/"
         
-        echo "📚 依存関係をインストール中..."
-        sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
-          cd $REMOTE_PATH
-          
-          # 仮想環境の作成・アクティベート
-          if [ ! -d 'venv' ]; then
-            python3 -m venv venv
-            echo '✅ 仮想環境を作成しました'
-          fi
-          
-          # 依存関係インストール（エラーハンドリング付き）
-          . venv/bin/activate
-          python3 -m pip install --upgrade pip
-          
-          # 古いPython対応のパッケージインストール
-          echo '📦 パッケージをインストール中...'
-          pip install streamlit==1.28.0 || pip install streamlit==1.25.0
-          pip install pandas==1.5.3 || pip install pandas==1.3.5
-          pip install numpy==1.21.6 || pip install numpy==1.19.5
-          pip install scikit-learn==1.1.3 || pip install scikit-learn==1.0.2
-          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-          pip install python-dotenv requests
-          pip install openai anthropic google-generativeai || echo '⚠️ AI APIパッケージは後でインストール'
-        "
+        # requirements.txtが変更された場合、または明示的に指定された場合のみ依存関係をインストール
+        if [ "${{ github.event.inputs.full_deploy }}" = "yes" ] || git diff --name-only HEAD^ HEAD | grep -q "requirements.txt"; then
+          echo "📚 依存関係をインストール中..."
+          sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
+            cd $REMOTE_PATH
+            
+            # 仮想環境の確認
+            if [ ! -d 'venv' ]; then
+              python3 -m venv venv
+              echo '✅ 仮想環境を作成しました'
+            fi
+            
+            # 依存関係インストール
+            . venv/bin/activate
+            python3 -m pip install --upgrade pip
+            
+            # 基本パッケージのみインストール（高速化）
+            pip install python-dotenv requests
+            echo '✅ 基本パッケージをインストールしました'
+          "
+        else
+          echo "ℹ️ 依存関係のインストールをスキップ（変更なし）"
+        fi
         
-        echo "⚙️ サービススクリプトを設定中..."
+        echo "⚙️ 実行権限を設定中..."
         sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
           cd $REMOTE_PATH
           chmod +x *.sh 2>/dev/null || true
           chmod +x *.py 2>/dev/null || true
-          
-          # shebang修正（さくらインターネット対応）
-          sed -i 's|#!/bin/bash|#!/bin/sh|g' *.sh 2>/dev/null || true
         "
         
-        echo "🔐 .envファイルを確認中..."
-        sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
-          cd $REMOTE_PATH
-          if [ -f '.env' ]; then
-            echo '✅ .envファイルが存在します (APIキー設定済み)'
-          else
-            if [ -f '.env.template' ]; then
-              echo '⚠️ .envファイルが存在しません。テンプレートから作成します...'
-              cp .env.template .env
-              echo '📝 .envファイルを編集してAPIキーを設定してください'
-            fi
-          fi
-        "
-        
-        echo "🌐 Web設定を確認中..."
+        echo "🌐 ファイル更新を実行中..."
         sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
           cd $REMOTE_PATH
           
-          # Web設定スクリプト実行（初回のみ）
-          if [ ! -f '/home/mokumoku/www/.htaccess' ]; then
-            echo '🔧 Web設定を実行中...'
-            sh web_setup.sh || echo '⚠️ Web設定は手動で実行してください'
-          else
-            echo '✅ Web設定は完了済み'
+          # index.htmlの更新（存在する場合）
+          if [ -f 'index_final.html' ]; then
+            cp index_final.html index.html
+            echo '✅ index.htmlを更新しました'
+          fi
+          
+          # APIサーバーの起動
+          if [ -f 'api_server_v2.py' ]; then
+            echo '🚀 API Server v2を起動中...'
+            nohup python3 api_server_v2.py > logs/api_server.log 2>&1 &
+            echo \$! > api_server.pid
+            sleep 3
+            
+            # ヘルスチェック
+            if curl -s http://localhost:8080/api/status > /dev/null; then
+              echo '✅ API Server v2が正常に起動しました'
+            else
+              echo '⚠️ API Serverの起動に失敗した可能性があります'
+            fi
+          elif [ -f 'api_server.py' ]; then
+            echo '🚀 API Serverを起動中...'
+            nohup python3 api_server.py > logs/api_server.log 2>&1 &
+            echo \$! > api_server.pid
           fi
         "
-        
-        # サービス再起動（workflow_dispatchの場合のみ制御可能）
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.restart_service }}" = "yes" ]; then
-          echo "🔄 サービスを再起動中..."
-          sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
-            cd $REMOTE_PATH
-            
-            # 既存サービス停止
-            if [ -f 'service.pid' ]; then
-              ./stop_tag_generator.sh || true
-              sleep 2
-            fi
-            
-            # サービス起動
-            ./start_tag_generator_web.sh || ./start_tag_generator.sh
-            
-            echo '✅ サービスを再起動しました'
-          "
-        else
-          echo "ℹ️ サービスの自動再起動はスキップされました"
-          echo "   手動で再起動: ssh $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_PATH && ./start_tag_generator_web.sh'"
-        fi
         
         echo ""
         echo "🎉 デプロイ完了!"
         echo "=================================="
-        echo "🌐 メインURL: http://mokumoku.sakura.ne.jp/tags/"
-        echo "🔗 直接アクセス: http://mokumoku.sakura.ne.jp:8501"
+        echo "🌐 メインURL: https://mokumoku.sakura.ne.jp/tags/"
+        echo "📱 デモ版: https://mokumoku.sakura.ne.jp/tags/webapp.html"
+        echo "🔗 API版: https://mokumoku.sakura.ne.jp/tags/webapp_api.html"
         echo ""
-        echo "📋 次の手順:"
-        echo "1. サービス状況確認: ssh $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_PATH && ./status_tag_generator.sh'"
-        echo "2. ログ確認: ssh $REMOTE_USER@$REMOTE_HOST 'tail -f $REMOTE_PATH/logs/service.log'"
-        echo "3. サービス起動: ssh $REMOTE_USER@$REMOTE_HOST 'cd $REMOTE_PATH && ./start_tag_generator_web.sh'"
+        echo "デプロイ時間: $(date +'%Y-%m-%d %H:%M:%S')"
     
     - name: 📊 Deployment Summary
       if: always()
@@ -192,3 +157,4 @@ jobs:
         echo "- **コミット**: ${{ github.sha }}"
         echo "- **実行者**: ${{ github.actor }}"
         echo "- **時刻**: $(date +'%Y-%m-%d %H:%M:%S')"
+        echo "- **フルデプロイ**: ${{ github.event.inputs.full_deploy || 'no' }}"
