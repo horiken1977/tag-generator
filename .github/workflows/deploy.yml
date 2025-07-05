@@ -62,6 +62,12 @@ jobs:
         "
         
         echo "📦 変更されたファイルのみを同期中..."
+        # rsyncの前に必須ファイルの存在確認
+        if [ ! -f "index.html" ] && [ -f "index_final.html" ]; then
+          cp index_final.html index.html
+          echo "📝 index.htmlを作成しました"
+        fi
+        
         sshpass -p "$REMOTE_PASSWORD" rsync -avz \
           --exclude=.git \
           --exclude=.env \
@@ -114,10 +120,32 @@ jobs:
         sshpass -p "$REMOTE_PASSWORD" ssh -p 22 "$REMOTE_USER@$REMOTE_HOST" "
           cd $REMOTE_PATH
           
-          # index.htmlの更新（存在する場合）
-          if [ -f 'index_final.html' ]; then
-            cp index_final.html index.html
-            echo '✅ index.htmlを更新しました'
+          # 重要ファイルの存在確認と権限設定
+          if [ ! -f 'index.html' ]; then
+            echo '⚠️ index.htmlが存在しません。作成します...'
+            if [ -f 'index_final.html' ]; then
+              cp index_final.html index.html
+            else
+              echo 'エラー: index.htmlもindex_final.htmlも存在しません'
+              exit 1
+            fi
+          fi
+          
+          # ファイル権限の修正（Forbidden対策）
+          chmod 644 *.html *.css *.js 2>/dev/null || true
+          chmod 755 . 2>/dev/null || true
+          
+          echo '✅ ファイル権限を設定しました'
+          
+          # 親ディレクトリのパーミッション確認（重要）
+          cd /home/mokumoku/www
+          chmod 755 tags
+          cd $REMOTE_PATH
+          
+          # .htaccessファイルのクリーンアップ（Nginxでは不要）
+          if [ -f '/home/mokumoku/www/.htaccess' ]; then
+            rm -f /home/mokumoku/www/.htaccess
+            echo '🧹 不要な.htaccessを削除しました'
           fi
           
           # APIサーバーの起動

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏷️ Tag Generator - WebApp</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 16px;
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #45a049; }
+        .btn-secondary { background: #2196F3; }
+        .btn-secondary:hover { background: #1976D2; }
+        .btn-home { background: #FF9800; }
+        .btn-home:hover { background: #F57C00; }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .status.success { background: rgba(76,175,80,0.3); }
+        .status.info { background: rgba(33,150,243,0.3); }
+        .status.warning { background: rgba(255,193,7,0.3); }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .hidden { display: none; }
+        .result-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .demo-mode {
+            background: rgba(255,193,7,0.2);
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Tag Generator</h1>
+            <p>マーケティング教育動画のAIタグ生成システム</p>
+            <button class="btn btn-home" onclick="window.location.href='index.html'">🏠 ホームに戻る</button>
+        </div>
+        
+        <div class="demo-mode">
+            <h3>🎯 デモモード</h3>
+            <p>現在はデモンストレーション版です。実際のAPI連携なしで機能をお試しいただけます。</p>
+        </div>
+        
+        <div class="card">
+            <h2>📊 Google Sheets 設定</h2>
+            <div class="form-group">
+                <label for="sheets-url">スプレッドシートURL</label>
+                <input type="url" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/...">
+            </div>
+            <div class="form-group">
+                <label for="sheet-name">シート名</label>
+                <select id="sheet-name">
+                    <option>動画データ</option>
+                    <option>マスタデータ</option>
+                    <option>結果出力</option>
+                </select>
+            </div>
+            <button class="btn btn-secondary" onclick="testConnection()">接続テスト</button>
+            <div id="connection-status"></div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>🤖 AI エンジン選択</h2>
+                <div class="form-group">
+                    <label for="ai-engine">処理エンジン</label>
+                    <select id="ai-engine">
+                        <option value="openai">OpenAI GPT-4</option>
+                        <option value="claude">Claude 3.5 Sonnet</option>
+                        <option value="gemini">Google Gemini</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="max-tags">最大タグ数</label>
+                    <select id="max-tags">
+                        <option value="150">150個</option>
+                        <option value="200" selected>200個 (推奨)</option>
+                        <option value="250">250個</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>⚙️ 処理設定</h2>
+                <div class="form-group">
+                    <label for="batch-size">バッチサイズ</label>
+                    <select id="batch-size">
+                        <option value="10">10件</option>
+                        <option value="20" selected>20件 (推奨)</option>
+                        <option value="50">50件</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quality">処理品質</label>
+                    <select id="quality">
+                        <option value="fast">高速処理</option>
+                        <option value="balanced" selected>バランス</option>
+                        <option value="high">高品質</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🚀 処理実行</h2>
+            <button class="btn" onclick="startProcessing()">タグ生成開始</button>
+            <button class="btn btn-secondary" onclick="previewData()">データプレビュー</button>
+            <button class="btn btn-secondary" onclick="showSampleTags()">サンプルタグ表示</button>
+            
+            <div id="processing-status" class="hidden">
+                <div class="progress">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <div id="status-text">処理中...</div>
+            </div>
+        </div>
+        
+        <div class="card result-section hidden" id="results">
+            <h2>📋 処理結果</h2>
+            <div id="result-content"></div>
+        </div>
+        
+        <div class="status info">
+            <strong>📝 現在の実装状況:</strong><br>
+            • ✅ 基本的なWebインターフェース実装済み<br>
+            • ✅ Google Sheets API接続機能（準備完了）<br>
+            • ✅ マルチAI対応システム構築済み<br>
+            • ✅ バッチ処理・最適化アルゴリズム実装済み<br>
+            • 🔄 さくらインターネット環境での最終調整中
+        </div>
+    </div>
+    
+    <script>
+        let isProcessing = false;
+        
+        function testConnection() {
+            const url = document.getElementById('sheets-url').value;
+            const statusDiv = document.getElementById('connection-status');
+            
+            if (!url) {
+                statusDiv.innerHTML = '<div class="status warning">URLを入力してください</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="status info">接続テスト中...</div>';
+            
+            setTimeout(() => {
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ 接続成功（デモモード）<br>
+                        シート数: 3個<br>
+                        データ行数: 400行<br>
+                        列: タイトル, スキル名, 説明文, 要約, 文字起こし
+                    </div>
+                `;
+            }, 1500);
+        }
+        
+        async function startProcessing() {
+            if (isProcessing) return;
+            
+            isProcessing = true;
+            const statusDiv = document.getElementById('processing-status');
+            const progressBar = document.getElementById('progress-bar');
+            const statusText = document.getElementById('status-text');
+            const resultsDiv = document.getElementById('results');
+            
+            statusDiv.classList.remove('hidden');
+            resultsDiv.classList.add('hidden');
+            
+            const steps = [
+                'Google Sheets データ読み込み中...',
+                'AI処理中 - バッチ1/20 (20件処理)',
+                'AI処理中 - バッチ5/20 (100件処理)',
+                'AI処理中 - バッチ10/20 (200件処理)',
+                'AI処理中 - バッチ15/20 (300件処理)',
+                'AI処理中 - バッチ20/20 (400件処理)',
+                'タグ重複排除・最適化中...',
+                '重要度スコアリング実行中...',
+                '結果をGoogle Sheetsに出力中...',
+                '完了!'
+            ];
+            
+            for (let i = 0; i < steps.length; i++) {
+                statusText.textContent = steps[i];
+                progressBar.style.width = ((i + 1) / steps.length * 100) + '%';
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
+            
+            const aiEngine = document.getElementById('ai-engine').selectedOptions[0].text;
+            const maxTags = document.getElementById('max-tags').value;
+            const batchSize = document.getElementById('batch-size').value;
+            const quality = document.getElementById('quality').selectedOptions[0].text;
+            
+            document.getElementById('result-content').innerHTML = `
+                <div class="status success">
+                    <h3>🎉 処理完了</h3>
+                    <p>• 処理動画数: 400件</p>
+                    <p>• 生成タグ数: 6,247個 → ${maxTags}個に最適化</p>
+                    <p>• 処理時間: 8分32秒</p>
+                    <p>• 使用AI: ${aiEngine}</p>
+                    <p>• バッチサイズ: ${batchSize}件</p>
+                    <p>• 処理品質: ${quality}</p>
+                    <p>• 重複排除: 5,847個削除</p>
+                    <p>• 重要度スコア: 平均8.4/10</p>
+                </div>
+                <h4>📋 生成タグサンプル</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    マーケティング, デジタル戦略, SEO, コンテンツ作成, ブランディング, 
+                    プレゼンテーション, リーダーシップ, チームワーク, 問題解決, 
+                    データ分析, 顧客体験, 営業スキル, プロジェクト管理...
+                </div>
+                <button class="btn">📥 結果をダウンロード</button>
+                <button class="btn btn-secondary">📊 新しいシートを作成</button>
+                <button class="btn btn-secondary">📈 詳細レポート表示</button>
+            `;
+            
+            resultsDiv.classList.remove('hidden');
+            statusDiv.classList.add('hidden');
+            isProcessing = false;
+        }
+        
+        function previewData() {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.innerHTML = `
+                <div class="status info">
+                    <h4>📊 データプレビュー（サンプル）</h4>
+                    <p><strong>動画タイトル例:</strong></p>
+                    <ul>
+                        <li>「効果的なプレゼンテーション技法 - 聴衆を惹きつける5つの方法」</li>
+                        <li>「デジタルマーケティング基礎 - SEOとSNS活用戦略」</li>
+                        <li>「チームビルディングの実践 - リモートワーク時代のマネジメント」</li>
+                        <li>「データ分析入門 - ビジネスに活かす統計の基本」</li>
+                        <li>「顧客体験向上の秘訣 - CX戦略の立て方」</li>
+                    </ul>
+                    <p><strong>データ形式:</strong> タイトル | スキル名 | 説明文 | 要約 | 文字起こし</p>
+                </div>
+            `;
+        }
+        
+        function showSampleTags() {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.innerHTML = `
+                <div class="status info">
+                    <h4>🏷️ 生成タグサンプル</h4>
+                    <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                        <strong>マーケティング関連:</strong><br>
+                        デジタルマーケティング, SEO対策, SNS運用, コンテンツマーケティング, 
+                        ブランド戦略, 顧客獲得, リードジェネレーション<br><br>
+                        
+                        <strong>ビジネススキル:</strong><br>
+                        プレゼンテーション, コミュニケーション, リーダーシップ, 
+                        チームマネジメント, プロジェクト管理, 問題解決<br><br>
+                        
+                        <strong>技術・分析:</strong><br>
+                        データ分析, Excel活用, Google Analytics, 
+                        BI ツール, 統計分析, レポート作成
+                    </div>
+                    <p><strong>最適化前:</strong> 6,247個 → <strong>最適化後:</strong> 200個（重複排除・重要度順）</p>
+                </div>
+            `;
+        }
+        
+        // ページ読み込み時の初期化
+        window.onload = function() {
+            console.log('Tag Generator WebApp（デモ版）が起動しました');
+            
+            // デモ用の初期メッセージ
+            setTimeout(() => {
+                const statusDiv = document.getElementById('connection-status');
+                statusDiv.innerHTML = `
+                    <div class="status info">
+                        💡 <strong>ヒント:</strong> 
+                        「接続テスト」ボタンでGoogle Sheets接続をシミュレーション、
+                        「データプレビュー」で処理対象データを確認できます。
+                    </div>
+                `;
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
