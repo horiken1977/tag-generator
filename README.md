@@ -6,14 +6,14 @@
 
 このプロジェクトのドキュメントはGitHub Pagesで公開されています：
 
-**🏠 メインページ**: [https://horiken1977.github.io/tags/](https://horiken1977.github.io/tags/)
+**🏠 メインページ（ダッシュボード）**: [https://horiken1977.github.io/tags/](https://horiken1977.github.io/tags/)
 
 ### 📄 ドキュメント一覧
 
-- **開発ダッシュボード**: [https://horiken1977.github.io/tags/docs/dashboard.html](https://horiken1977.github.io/tags/docs/dashboard.html)
-- **機能設計書**: [https://horiken1977.github.io/tags/docs/feature_design.html](https://horiken1977.github.io/tags/docs/feature_design.html)
-- **環境設計書**: [https://horiken1977.github.io/tags/docs/environment_design.html](https://horiken1977.github.io/tags/docs/environment_design.html)
-- **テスト仕様書**: [https://horiken1977.github.io/tags/docs/test_specification.html](https://horiken1977.github.io/tags/docs/test_specification.html)
+- **開発ダッシュボード**: [https://horiken1977.github.io/tags/](https://horiken1977.github.io/tags/)
+- **機能設計書**: [https://horiken1977.github.io/tags/feature_design.html](https://horiken1977.github.io/tags/feature_design.html)
+- **環境設計書**: [https://horiken1977.github.io/tags/environment_design.html](https://horiken1977.github.io/tags/environment_design.html)
+- **テスト仕様書**: [https://horiken1977.github.io/tags/test_specification.html](https://horiken1977.github.io/tags/test_specification.html)
 
 ## ✨ 主要機能
 

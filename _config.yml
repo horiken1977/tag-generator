@@ -7,22 +7,18 @@ url: ""
 
 # Build settings
 markdown: kramdown
+source: docs
 exclude:
-  - scripts/
-  - test/
-  - backups/
+  - "../scripts/"
+  - "../test/"
+  - "../backups/"
   - "*.py"
   - "*.sh"
   - "*.json"
   - "*.log"
-  - ".git*"
-  - "CLAUDE.md"
+  - "../.git*"
+  - "../CLAUDE.md"
   - "*.backup"
-
-# Include settings
-include:
-  - docs/
-  - index.html
 
 # Plugins
 plugins: []
