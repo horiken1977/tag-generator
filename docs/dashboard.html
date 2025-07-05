@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>開発ダッシュボード</title>
+    <title>開発プロジェクト管理システム - ダッシュボード</title>
     <style>
         * {
             margin: 0;
@@ -114,6 +114,18 @@
             margin: 20px 0;
             font-size: 0.9em;
         }
+        .command {
+            background: #2c3e50;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .quick-links {
+            margin-top: 15px;
+        }
         .next-tasks {
             background: #e8f5e9;
             border-left: 4px solid #4caf50;
@@ -180,7 +192,6 @@
             <div class="card">
                 <h2>📁 ドキュメント</h2>
                 <div class="links">
-                    <a href="../index.html" class="link-button">ホームページ</a>
                     <a href="feature_design.html" class="link-button">機能設計書</a>
                     <a href="environment_design.html" class="link-button">環境設計書</a>
                     <a href="test_specification.html" class="link-button">テスト仕様書</a>
@@ -210,6 +221,75 @@
             <h2>📈 進捗チャート</h2>
             <div class="chart-container">
                 <canvas id="progressChart" width="800" height="400"></canvas>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📌 プロジェクト概要</h2>
+            <p>
+                このシステムは、Claude Codeとの対話を通じて開発ドキュメントを自動的に生成・更新し、
+                プロジェクトの進捗を可視化することを目的とした開発支援ツールです。
+            </p>
+            
+            <h3>✨ 主要機能</h3>
+            <ul>
+                <li><strong>自動ドキュメント生成</strong> - チャット内容から自動的にドキュメントを生成・更新</li>
+                <li><strong>進捗可視化</strong> - プロジェクトの進捗をグラフィカルに表示</li>
+                <li><strong>チャット自動保存</strong> - 2時間ごとにチャット履歴を自動バックアップ</li>
+                <li><strong>テスト管理</strong> - テストケースの管理と実行結果の記録</li>
+            </ul>
+            
+            <div class="quick-links">
+                <a href="https://github.com/horiken1977/tags" class="link-button">GitHubリポジトリ</a>
+                <a href="#setup" class="link-button">セットアップ方法</a>
+                <a href="#scripts" class="link-button">スクリプト実行</a>
+            </div>
+        </div>
+        
+        <div class="card" id="setup">
+            <h2>🚀 セットアップ方法</h2>
+            
+            <h3>前提条件</h3>
+            <ul>
+                <li>Python 3.8以上</li>
+                <li>Git（リポジトリ管理を行う場合）</li>
+            </ul>
+            
+            <h3>インストール手順</h3>
+            <ol>
+                <li>リポジトリをクローン
+                    <div class="command">git clone https://github.com/horiken1977/tags.git</div>
+                </li>
+                <li>必要なPythonパッケージをインストール
+                    <div class="command">pip install schedule</div>
+                </li>
+                <li>スクリプトの実行権限を付与（Unix系OSの場合）
+                    <div class="command">chmod +x docs/auto_updater.py<br>chmod +x scripts/chat_backup.py</div>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="card" id="scripts">
+            <h2>📝 スクリプト実行方法</h2>
+            
+            <h3>ドキュメント自動更新</h3>
+            <p>チャット内容を監視してドキュメントを自動更新：</p>
+            <div class="command">
+                # 監視モードで実行（推奨）<br>
+                python docs/auto_updater.py<br><br>
+                # 1回だけ実行<br>
+                python docs/auto_updater.py --once
+            </div>
+            
+            <h3>チャット自動保存</h3>
+            <p>定期的にチャット履歴をバックアップ：</p>
+            <div class="command">
+                # デフォルト設定（2時間ごと）で実行<br>
+                python scripts/chat_backup.py<br><br>
+                # カスタム間隔で実行<br>
+                python scripts/chat_backup.py --interval 3h<br><br>
+                # バックアップ一覧を表示<br>
+                python scripts/chat_backup.py --list
             </div>
         </div>
     </div>
