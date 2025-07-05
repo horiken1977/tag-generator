@@ -273,13 +273,14 @@
         let sheetData = null;
         let columnHeaders = [];
         
-        // APIベースURLの設定（ポート8080を直接指定）
-        const API_BASE_URL = window.location.protocol + '//' + window.location.hostname + ':8080';
+        // APIベースURLの設定（PHP API使用）
+        const API_BASE_URL = window.location.protocol + '//' + window.location.hostname + window.location.pathname.replace(/\/[^\/]*$/, '') + '/api.php';
         
         // API呼び出しのヘルパー関数
-        async function callAPI(endpoint, options = {}) {
+        async function callAPI(action, options = {}) {
             try {
-                const response = await fetch(API_BASE_URL + endpoint, {
+                const url = API_BASE_URL + '?action=' + action;
+                const response = await fetch(url, {
                     ...options,
                     headers: {
                         'Content-Type': 'application/json',
@@ -301,7 +302,7 @@
         // サーバー状況確認
         async function checkApiStatus() {
             try {
-                const data = await callAPI('/api/status');
+                const data = await callAPI('status');
                 
                 if (data.status === 'running') {
                     document.getElementById('api-status').innerHTML = 
@@ -314,7 +315,7 @@
                 
                 // デバッグ情報を表示
                 console.error('API Status Check Failed:', error);
-                console.log('Attempted URL:', API_BASE_URL + '/api/status');
+                console.log('Attempted URL:', API_BASE_URL + '?action=status');
                 
                 return false;
             }
@@ -337,7 +338,7 @@
             statusDiv.innerHTML = '<div class="status info">接続テスト中...</div>';
             
             try {
-                const data = await callAPI('/api/sheets/test', {
+                const data = await callAPI('sheets_test', {
                     method: 'POST',
                     body: JSON.stringify({url: url})
                 });
@@ -472,7 +473,7 @@
                 statusText.textContent = 'Google Sheetsからデータを読み込み中...';
                 progressBar.style.width = '20%';
                 
-                const sheetsResponse = await callAPI('/api/sheets/data', {
+                const sheetsResponse = await callAPI('sheets_data', {
                     method: 'POST',
                     body: JSON.stringify({
                         url: url,
@@ -487,7 +488,7 @@
                 statusText.textContent = 'AI処理中...';
                 progressBar.style.width = '60%';
                 
-                const aiResponse = await callAPI('/api/ai/process', {
+                const aiResponse = await callAPI('ai_process', {
                     method: 'POST',
                     body: JSON.stringify({
                         data: sheetsData.data,
@@ -505,7 +506,7 @@
                 progressBar.style.width = '90%';
                 
                 const allTags = aiData.results.map(item => item.generated_tags);
-                const optimizeResponse = await callAPI('/api/tags/optimize', {
+                const optimizeResponse = await callAPI('tags_optimize', {
                     method: 'POST',
                     body: JSON.stringify({
                         tags: allTags,
@@ -575,7 +576,7 @@
             statusDiv.innerHTML = '<div class="status info">データプレビューを読み込み中...</div>';
             
             try {
-                const response = await callAPI('/api/sheets/data', {
+                const response = await callAPI('sheets_data', {
                     method: 'POST',
                     body: JSON.stringify({preview: true})
                 });
