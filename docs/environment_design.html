@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>環境設計書</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 3px solid #e67e22;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #34495e;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #e67e22;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin: 20px 0 10px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .directory-tree {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+        .directory-tree pre {
+            margin: 0;
+            white-space: pre;
+        }
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .tech-item {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #e67e22;
+        }
+        .tech-item h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .requirement-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .requirement-table th,
+        .requirement-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .requirement-table th {
+            background: #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .requirement-table tr:hover {
+            background: #f5f5f5;
+        }
+        .config-block {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.active { background: #2ecc71; }
+        .status-indicator.pending { background: #f39c12; }
+        .status-indicator.inactive { background: #e74c3c; }
+        .update-info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .script-info {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .script-info h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        .command {
+            background: #2c3e50;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← ダッシュボードに戻る</a>
+        
+        <h1>🔧 環境設計書</h1>
+        
+        <div class="update-info">
+            <strong>最終更新:</strong> <span id="lastUpdate"></span><br>
+            <strong>環境バージョン:</strong> <span id="envVersion">1.0.0</span>
+        </div>
+        
+        <div class="section">
+            <h2>1. システム構成</h2>
+            <p>本システムは、ローカル環境で動作する開発支援ツールです。</p>
+            
+            <h3>動作環境</h3>
+            <table class="requirement-table">
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>要件</th>
+                        <th>推奨</th>
+                        <th>状態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>OS</td>
+                        <td>macOS 12.0+ / Windows 10+ / Linux</td>
+                        <td>macOS 14.0+</td>
+                        <td><span class="status-indicator active"></span>対応済み</td>
+                    </tr>
+                    <tr>
+                        <td>Node.js</td>
+                        <td>16.0+</td>
+                        <td>20.0+</td>
+                        <td><span class="status-indicator pending"></span>確認中</td>
+                    </tr>
+                    <tr>
+                        <td>Python</td>
+                        <td>3.8+</td>
+                        <td>3.11+</td>
+                        <td><span class="status-indicator pending"></span>確認中</td>
+                    </tr>
+                    <tr>
+                        <td>ブラウザ</td>
+                        <td>Chrome 90+, Firefox 88+, Safari 14+</td>
+                        <td>最新版</td>
+                        <td><span class="status-indicator active"></span>対応済み</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>2. ディレクトリ構造</h2>
+            <div class="directory-tree">
+                <pre>
+/
+├── docs/                    # ドキュメント関連
+│   ├── dashboard.html       # 開発ダッシュボード
+│   ├── feature_design.html  # 機能設計書
+│   ├── environment_design.html  # 環境設計書（本ファイル）
+│   ├── test_specification.html  # テスト仕様書
+│   ├── progress_data.json   # 進捗データ
+│   └── auto_updater.py      # 自動更新スクリプト
+│
+├── test/                    # テスト関連
+│   ├── scripts/            # テストスクリプト
+│   │   ├── run_tests.py    # テスト実行スクリプト
+│   │   ├── test_runner.sh  # テストランナー
+│   │   └── coverage.py     # カバレッジ計測
+│   │
+│   └── data/               # テストデータ
+│       ├── sample_chat.json    # サンプルチャットデータ
+│       ├── test_cases.json     # テストケース定義
+│       └── expected_results/   # 期待結果データ
+│
+├── scripts/                 # ユーティリティスクリプト
+│   ├── chat_analyzer.py     # チャット解析スクリプト
+│   ├── chat_backup.py       # チャットバックアップ
+│   └── setup.sh            # 環境セットアップ
+│
+├── CLAUDE.md               # Claude Code設定ファイル
+├── .gitignore              # Git除外設定
+└── README.md               # プロジェクト説明
+                </pre>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>3. 技術スタック</h2>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>フロントエンド</h4>
+                    <ul>
+                        <li>HTML5</li>
+                        <li>CSS3 (Grid, Flexbox)</li>
+                        <li>Vanilla JavaScript</li>
+                        <li>Chart.js (予定)</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>バックエンド</h4>
+                    <ul>
+                        <li>Python 3.x</li>
+                        <li>Node.js (オプション)</li>
+                        <li>Shell Script</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>データ管理</h4>
+                    <ul>
+                        <li>JSON ファイル</li>
+                        <li>ローカルストレージ</li>
+                        <li>ファイルシステム</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>開発ツール</h4>
+                    <ul>
+                        <li>Claude Code</li>
+                        <li>Git (オプション)</li>
+                        <li>VS Code (推奨)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>4. 自動化スクリプト</h2>
+            
+            <div class="script-info">
+                <h4>📝 チャット解析・ドキュメント更新スクリプト</h4>
+                <p><strong>ファイル:</strong> docs/auto_updater.py</p>
+                <p><strong>機能:</strong></p>
+                <ul>
+                    <li>Claude Codeとのチャット内容を解析</li>
+                    <li>機能要件、環境設定、テスト情報を抽出</li>
+                    <li>各設計書を自動更新</li>
+                    <li>進捗情報の計算と更新</li>
+                </ul>
+                <div class="command">python docs/auto_updater.py</div>
+            </div>
+            
+            <div class="script-info">
+                <h4>💾 チャット自動保存スクリプト</h4>
+                <p><strong>ファイル:</strong> scripts/chat_backup.py</p>
+                <p><strong>機能:</strong></p>
+                <ul>
+                    <li>2時間ごとに自動実行</li>
+                    <li>チャット履歴をCLAUDE.mdに保存</li>
+                    <li>クラッシュ対応のバックアップ</li>
+                    <li>ターミナルへの状態表示</li>
+                </ul>
+                <div class="command">python scripts/chat_backup.py --interval 2h</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>5. 環境セットアップ</h2>
+            
+            <h3>初期セットアップ手順</h3>
+            <ol>
+                <li>リポジトリのクローン（Gitを使用する場合）</li>
+                <li>必要なディレクトリの作成（完了済み）</li>
+                <li>Python環境の準備</li>
+                <li>自動化スクリプトの初期設定</li>
+                <li>CLAUDE.mdファイルの設定</li>
+            </ol>
+            
+            <h3>設定ファイル</h3>
+            <div class="config-block">
+                <strong>CLAUDE.md 設定例:</strong><br>
+                # Claude Code Configuration<br>
+                <br>
+                ## Auto-save Settings<br>
+                - Interval: 2 hours<br>
+                - Backup location: ./backups/<br>
+                - Max backups: 10<br>
+                <br>
+                ## Document Update Settings<br>
+                - Auto-update: enabled<br>
+                - Update trigger: on chat message<br>
+                - Progress calculation: automatic<br>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>6. 依存関係</h2>
+            
+            <h3>Pythonパッケージ</h3>
+            <div class="config-block">
+                # requirements.txt<br>
+                json5>=0.9.6<br>
+                schedule>=1.1.0<br>
+                watchdog>=2.1.0<br>
+            </div>
+            
+            <h3>システムコマンド</h3>
+            <ul>
+                <li>python3 - Python実行環境</li>
+                <li>cron または launchd - 定期実行用</li>
+                <li>curl - API通信用（オプション）</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>7. 運用・保守</h2>
+            
+            <h3>ログファイル</h3>
+            <table class="requirement-table">
+                <thead>
+                    <tr>
+                        <th>ログ種別</th>
+                        <th>ファイルパス</th>
+                        <th>保存期間</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>自動更新ログ</td>
+                        <td>logs/auto_update.log</td>
+                        <td>30日</td>
+                    </tr>
+                    <tr>
+                        <td>バックアップログ</td>
+                        <td>logs/backup.log</td>
+                        <td>30日</td>
+                    </tr>
+                    <tr>
+                        <td>エラーログ</td>
+                        <td>logs/error.log</td>
+                        <td>90日</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>バックアップ戦略</h3>
+            <ul>
+                <li>チャット履歴: 2時間ごと自動保存</li>
+                <li>ドキュメント: 更新時に自動バックアップ</li>
+                <li>設定ファイル: 日次バックアップ</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // 最終更新日時の設定
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        
+        // 自動更新スクリプトから呼び出される関数
+        function updateEnvironmentDesign(data) {
+            // 環境情報の更新
+            if (data.version) {
+                document.getElementById('envVersion').textContent = data.version;
+            }
+            
+            // ディレクトリ構造の更新
+            if (data.directoryStructure) {
+                // ディレクトリツリーの再描画
+            }
+            
+            // 最終更新日時の更新
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        }
+    </script>
+</body>
+</html>

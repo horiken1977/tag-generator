@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テスト仕様書</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 3px solid #9b59b6;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #34495e;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #9b59b6;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin: 20px 0 10px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #9b59b6;
+        }
+        .test-case h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .test-status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .test-status.passed { background: #d4edda; color: #155724; }
+        .test-status.failed { background: #f8d7da; color: #721c24; }
+        .test-status.pending { background: #fff3cd; color: #856404; }
+        .test-status.skipped { background: #e2e3e5; color: #383d41; }
+        .test-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .test-table th,
+        .test-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .test-table th {
+            background: #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .test-table tr:hover {
+            background: #f5f5f5;
+        }
+        .coverage-container {
+            margin: 20px 0;
+        }
+        .coverage-bar {
+            background: #ecf0f1;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .coverage-fill {
+            height: 100%;
+            background: linear-gradient(to right, #9b59b6, #8e44ad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: width 0.5s ease;
+        }
+        .test-priority {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+        .test-priority.high { background: #ffebee; color: #c62828; }
+        .test-priority.medium { background: #fff8e1; color: #f57f17; }
+        .test-priority.low { background: #e8f5e9; color: #2e7d32; }
+        .test-command {
+            background: #2c3e50;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            display: block;
+        }
+        .test-result {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .update-info {
+            background: #e8daef;
+            border-left: 4px solid #9b59b6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .test-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #9b59b6;
+        }
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← ダッシュボードに戻る</a>
+        
+        <h1>🧪 テスト仕様書</h1>
+        
+        <div class="update-info">
+            <strong>最終更新:</strong> <span id="lastUpdate"></span><br>
+            <strong>テスト実行回数:</strong> <span id="testRuns">0</span>
+        </div>
+        
+        <div class="section">
+            <h2>1. テスト概要</h2>
+            <p>本システムのテストは、機能テスト、統合テスト、パフォーマンステストの3つのカテゴリに分類されます。</p>
+            
+            <div class="test-metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="totalTests">0</div>
+                    <div class="metric-label">総テストケース数</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="passedTests">0</div>
+                    <div class="metric-label">成功</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="failedTests">0</div>
+                    <div class="metric-label">失敗</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="pendingTests">0</div>
+                    <div class="metric-label">未実行</div>
+                </div>
+            </div>
+            
+            <h3>テストカバレッジ</h3>
+            <div class="coverage-container">
+                <div class="coverage-bar">
+                    <div class="coverage-fill" id="coverageBar" style="width: 0%">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>2. テストケース一覧</h2>
+            
+            <h3>機能テスト</h3>
+            
+            <div class="test-case">
+                <h4>TC001: ドキュメント自動生成機能 <span class="test-status pending">未実行</span></h4>
+                <p><strong>目的:</strong> チャット内容からドキュメントが正しく生成されることを確認</p>
+                <p><strong>優先度:</strong> <span class="test-priority high">高</span></p>
+                <p><strong>手順:</strong></p>
+                <ol>
+                    <li>テスト用チャットデータを準備</li>
+                    <li>自動解析スクリプトを実行</li>
+                    <li>生成されたドキュメントの内容を確認</li>
+                </ol>
+                <p><strong>期待結果:</strong> チャット内容が正しく解析され、ドキュメントに反映される</p>
+            </div>
+            
+            <div class="test-case">
+                <h4>TC002: 進捗計算機能 <span class="test-status pending">未実行</span></h4>
+                <p><strong>目的:</strong> 進捗率が正しく計算されることを確認</p>
+                <p><strong>優先度:</strong> <span class="test-priority high">高</span></p>
+                <p><strong>手順:</strong></p>
+                <ol>
+                    <li>テストデータで進捗情報を設定</li>
+                    <li>進捗計算関数を実行</li>
+                    <li>計算結果を検証</li>
+                </ol>
+                <p><strong>期待結果:</strong> 各項目の進捗率が正しく計算される</p>
+            </div>
+            
+            <div class="test-case">
+                <h4>TC003: チャットバックアップ機能 <span class="test-status pending">未実行</span></h4>
+                <p><strong>目的:</strong> チャット履歴が定期的にバックアップされることを確認</p>
+                <p><strong>優先度:</strong> <span class="test-priority medium">中</span></p>
+                <p><strong>手順:</strong></p>
+                <ol>
+                    <li>バックアップスクリプトを起動</li>
+                    <li>指定時間経過後の動作を確認</li>
+                    <li>バックアップファイルの内容を検証</li>
+                </ol>
+                <p><strong>期待結果:</strong> 2時間ごとにチャット履歴がCLAUDE.mdに保存される</p>
+            </div>
+            
+            <h3>統合テスト</h3>
+            
+            <div class="test-case">
+                <h4>IT001: エンドツーエンドワークフロー <span class="test-status pending">未実行</span></h4>
+                <p><strong>目的:</strong> システム全体の連携動作を確認</p>
+                <p><strong>優先度:</strong> <span class="test-priority high">高</span></p>
+                <p><strong>手順:</strong></p>
+                <ol>
+                    <li>チャットでの機能要求を入力</li>
+                    <li>自動解析・更新の実行</li>
+                    <li>ダッシュボードでの表示確認</li>
+                    <li>各設計書の更新確認</li>
+                </ol>
+                <p><strong>期待結果:</strong> 全コンポーネントが正しく連携して動作する</p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>3. テスト実行方法</h2>
+            
+            <h3>単体テストの実行</h3>
+            <div class="test-command">python test/scripts/run_tests.py --type unit</div>
+            
+            <h3>統合テストの実行</h3>
+            <div class="test-command">python test/scripts/run_tests.py --type integration</div>
+            
+            <h3>全テストの実行</h3>
+            <div class="test-command">python test/scripts/run_tests.py --all</div>
+            
+            <h3>カバレッジレポートの生成</h3>
+            <div class="test-command">python test/scripts/coverage.py --report html</div>
+        </div>
+        
+        <div class="section">
+            <h2>4. テストデータ</h2>
+            
+            <table class="test-table">
+                <thead>
+                    <tr>
+                        <th>データファイル</th>
+                        <th>用途</th>
+                        <th>形式</th>
+                        <th>場所</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>sample_chat.json</td>
+                        <td>チャット解析テスト用</td>
+                        <td>JSON</td>
+                        <td>test/data/</td>
+                    </tr>
+                    <tr>
+                        <td>test_cases.json</td>
+                        <td>テストケース定義</td>
+                        <td>JSON</td>
+                        <td>test/data/</td>
+                    </tr>
+                    <tr>
+                        <td>expected_results/</td>
+                        <td>期待結果データ</td>
+                        <td>各種</td>
+                        <td>test/data/expected_results/</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>5. テスト結果</h2>
+            
+            <h3>最新のテスト実行結果</h3>
+            <div class="test-result">
+                <pre id="latestTestResult">テストはまだ実行されていません。</pre>
+            </div>
+            
+            <h3>テスト履歴</h3>
+            <table class="test-table">
+                <thead>
+                    <tr>
+                        <th>実行日時</th>
+                        <th>総数</th>
+                        <th>成功</th>
+                        <th>失敗</th>
+                        <th>カバレッジ</th>
+                        <th>実行時間</th>
+                    </tr>
+                </thead>
+                <tbody id="testHistory">
+                    <tr>
+                        <td colspan="6" style="text-align: center;">テスト履歴はありません</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>6. 品質基準</h2>
+            
+            <table class="test-table">
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>基準値</th>
+                        <th>現在値</th>
+                        <th>状態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>コードカバレッジ</td>
+                        <td>80%以上</td>
+                        <td id="currentCoverage">0%</td>
+                        <td><span class="test-status pending">未達成</span></td>
+                    </tr>
+                    <tr>
+                        <td>テスト成功率</td>
+                        <td>95%以上</td>
+                        <td id="successRate">0%</td>
+                        <td><span class="test-status pending">未達成</span></td>
+                    </tr>
+                    <tr>
+                        <td>重要度「高」のテスト成功率</td>
+                        <td>100%</td>
+                        <td id="criticalSuccessRate">0%</td>
+                        <td><span class="test-status pending">未達成</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // 最終更新日時の設定
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        
+        // テストデータの初期化（実際にはスクリプトから更新される）
+        const testData = {
+            total: 4,
+            passed: 0,
+            failed: 0,
+            pending: 4,
+            coverage: 0,
+            runs: 0
+        };
+        
+        // メトリクスの更新
+        function updateMetrics() {
+            document.getElementById('totalTests').textContent = testData.total;
+            document.getElementById('passedTests').textContent = testData.passed;
+            document.getElementById('failedTests').textContent = testData.failed;
+            document.getElementById('pendingTests').textContent = testData.pending;
+            document.getElementById('testRuns').textContent = testData.runs;
+            
+            // カバレッジバーの更新
+            const coverageBar = document.getElementById('coverageBar');
+            coverageBar.style.width = testData.coverage + '%';
+            coverageBar.textContent = testData.coverage + '%';
+            
+            document.getElementById('currentCoverage').textContent = testData.coverage + '%';
+            
+            // 成功率の計算
+            const successRate = testData.total > 0 ? Math.round((testData.passed / testData.total) * 100) : 0;
+            document.getElementById('successRate').textContent = successRate + '%';
+        }
+        
+        // 自動更新スクリプトから呼び出される関数
+        function updateTestSpecification(data) {
+            if (data.testResults) {
+                testData.total = data.testResults.total || testData.total;
+                testData.passed = data.testResults.passed || 0;
+                testData.failed = data.testResults.failed || 0;
+                testData.pending = data.testResults.pending || testData.total;
+                testData.coverage = data.testResults.coverage || 0;
+                testData.runs = (testData.runs || 0) + 1;
+                
+                updateMetrics();
+            }
+            
+            if (data.latestResult) {
+                document.getElementById('latestTestResult').textContent = data.latestResult;
+            }
+            
+            // 最終更新日時の更新
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        }
+        
+        // 初期表示
+        updateMetrics();
+    </script>
+</body>
+</html>
