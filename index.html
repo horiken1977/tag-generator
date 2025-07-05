@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>開発プロジェクト - ホーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        .card h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-icon {
+            font-size: 1.5em;
+        }
+        .card p {
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+        .card-action {
+            color: #3498db;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .info-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .info-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .quick-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .quick-link {
+            background: #ecf0f1;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            color: #34495e;
+            transition: background 0.3s;
+        }
+        .quick-link:hover {
+            background: #bdc3c7;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .status-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .status-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .status-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        footer {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 50px;
+            padding: 20px;
+            border-top: 1px solid #ecf0f1;
+        }
+        .github-link {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .github-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>🚀 開発プロジェクト管理システム</h1>
+            <p class="subtitle">開発ドキュメントの自動生成・管理・可視化ツール</p>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="main-grid">
+            <a href="docs/dashboard.html" class="card">
+                <h2><span class="card-icon">📊</span> 開発ダッシュボード</h2>
+                <p>プロジェクトの進捗状況をリアルタイムで確認。グラフィカルな表示で全体像を把握できます。</p>
+                <span class="card-action">ダッシュボードを開く →</span>
+            </a>
+            
+            <a href="docs/feature_design.html" class="card">
+                <h2><span class="card-icon">📋</span> 機能設計書</h2>
+                <p>実装予定の機能一覧、API設計、データモデルなどの詳細な仕様を確認できます。</p>
+                <span class="card-action">設計書を確認 →</span>
+            </a>
+            
+            <a href="docs/environment_design.html" class="card">
+                <h2><span class="card-icon">🔧</span> 環境設計書</h2>
+                <p>システム構成、ディレクトリ構造、依存関係など環境に関する詳細情報。</p>
+                <span class="card-action">環境情報を見る →</span>
+            </a>
+            
+            <a href="docs/test_specification.html" class="card">
+                <h2><span class="card-icon">🧪</span> テスト仕様書</h2>
+                <p>テストケース、実行結果、カバレッジ情報などテストに関する全ての情報。</p>
+                <span class="card-action">テスト仕様を確認 →</span>
+            </a>
+        </div>
+        
+        <div class="info-section">
+            <h2>📌 プロジェクト概要</h2>
+            <p>
+                このシステムは、Claude Codeとの対話を通じて開発ドキュメントを自動的に生成・更新し、
+                プロジェクトの進捗を可視化することを目的としています。
+            </p>
+            
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-value">4</div>
+                    <div class="status-label">ドキュメント数</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value">2</div>
+                    <div class="status-label">自動化スクリプト</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value">実装済</div>
+                    <div class="status-label">ステータス</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h2>🔗 クイックリンク</h2>
+            <div class="quick-links">
+                <a href="#features" class="quick-link">主要機能</a>
+                <a href="#setup" class="quick-link">セットアップ方法</a>
+                <a href="#scripts" class="quick-link">スクリプト実行</a>
+                <a href="https://github.com/horiken1977/tags" class="quick-link">GitHubリポジトリ</a>
+            </div>
+        </div>
+        
+        <div class="info-section" id="features">
+            <h2>✨ 主要機能</h2>
+            <ul>
+                <li><strong>自動ドキュメント生成</strong> - チャット内容から自動的にドキュメントを生成・更新</li>
+                <li><strong>進捗可視化</strong> - プロジェクトの進捗をグラフィカルに表示</li>
+                <li><strong>チャット自動保存</strong> - 2時間ごとにチャット履歴を自動バックアップ</li>
+                <li><strong>テスト管理</strong> - テストケースの管理と実行結果の記録</li>
+            </ul>
+        </div>
+        
+        <div class="info-section" id="setup">
+            <h2>🚀 セットアップ方法</h2>
+            <ol>
+                <li>リポジトリをクローン（Gitを使用する場合）</li>
+                <li>Python 3.8以上をインストール</li>
+                <li>必要なパッケージをインストール: <code>pip install schedule</code></li>
+                <li>自動更新スクリプトを実行: <code>python docs/auto_updater.py</code></li>
+                <li>チャット保存スクリプトを実行: <code>python scripts/chat_backup.py</code></li>
+            </ol>
+        </div>
+        
+        <div class="info-section" id="scripts">
+            <h2>📝 スクリプト実行方法</h2>
+            <h3>ドキュメント自動更新</h3>
+            <pre style="background: #2c3e50; color: white; padding: 15px; border-radius: 5px; overflow-x: auto;">
+# 監視モードで実行（推奨）
+python docs/auto_updater.py
+
+# 1回だけ実行
+python docs/auto_updater.py --once</pre>
+            
+            <h3>チャット自動保存</h3>
+            <pre style="background: #2c3e50; color: white; padding: 15px; border-radius: 5px; overflow-x: auto;">
+# デフォルト設定（2時間ごと）で実行
+python scripts/chat_backup.py
+
+# バックアップ一覧を表示
+python scripts/chat_backup.py --list</pre>
+        </div>
+    </div>
+    
+    <footer>
+        <p>
+            開発プロジェクト管理システム | 
+            <a href="https://github.com/horiken1977/tags" class="github-link">GitHub</a> | 
+            Powered by Claude Code
+        </p>
+    </footer>
+</body>
+</html>

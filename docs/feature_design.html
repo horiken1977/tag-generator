@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機能設計書</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #34495e;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #3498db;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin: 20px 0 10px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .feature-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #3498db;
+        }
+        .feature-item h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-badge.planned { background: #e3f2fd; color: #1976d2; }
+        .status-badge.in-progress { background: #fff3e0; color: #f57c00; }
+        .status-badge.completed { background: #e8f5e9; color: #388e3c; }
+        .priority {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+        .priority.high { background: #ffebee; color: #c62828; }
+        .priority.medium { background: #fff8e1; color: #f57f17; }
+        .priority.low { background: #e8f5e9; color: #2e7d32; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        tr:hover {
+            background: #f5f5f5;
+        }
+        .api-endpoint {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .method.get { background: #4caf50; }
+        .method.post { background: #2196f3; }
+        .method.put { background: #ff9800; }
+        .method.delete { background: #f44336; }
+        .update-info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .diagram {
+            background: #f5f5f5;
+            border: 2px dashed #bdc3c7;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../index.html" class="back-link">← ホームに戻る</a>
+        <a href="dashboard.html" class="back-link">ダッシュボード</a>
+        
+        <h1>📋 機能設計書</h1>
+        
+        <div class="update-info">
+            <strong>最終更新:</strong> <span id="lastUpdate"></span><br>
+            <strong>バージョン:</strong> <span id="version">1.0.0</span>
+        </div>
+        
+        <div class="section">
+            <h2>1. システム概要</h2>
+            <p>このアプリケーションは、開発プロセスの効率化と自動化を目的としたシステムです。</p>
+            <h3>主要機能</h3>
+            <ul>
+                <li>開発ドキュメントの自動生成と更新</li>
+                <li>チャット内容の自動解析と反映</li>
+                <li>進捗状況の可視化</li>
+                <li>テスト管理と自動実行</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>2. 機能一覧</h2>
+            
+            <div class="feature-item">
+                <h4>F001: ドキュメント自動生成機能 <span class="status-badge planned">計画中</span></h4>
+                <p><strong>概要:</strong> チャット内容から自動的にドキュメントを生成・更新する</p>
+                <p><strong>優先度:</strong> <span class="priority high">高</span></p>
+                <p><strong>詳細:</strong></p>
+                <ul>
+                    <li>チャット履歴の解析</li>
+                    <li>機能要件の抽出</li>
+                    <li>設計書への自動反映</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>F002: 進捗可視化機能 <span class="status-badge planned">計画中</span></h4>
+                <p><strong>概要:</strong> プロジェクトの進捗をリアルタイムで可視化</p>
+                <p><strong>優先度:</strong> <span class="priority high">高</span></p>
+                <p><strong>詳細:</strong></p>
+                <ul>
+                    <li>進捗率の自動計算</li>
+                    <li>グラフィカルな表示</li>
+                    <li>フェーズ管理</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>F003: チャット自動保存機能 <span class="status-badge planned">計画中</span></h4>
+                <p><strong>概要:</strong> チャット履歴を定期的に保存</p>
+                <p><strong>優先度:</strong> <span class="priority medium">中</span></p>
+                <p><strong>詳細:</strong></p>
+                <ul>
+                    <li>2時間ごとの自動保存</li>
+                    <li>クラッシュ対応</li>
+                    <li>復元機能</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>3. API設計</h2>
+            
+            <h3>エンドポイント一覧</h3>
+            
+            <div class="api-endpoint">
+                <span class="method get">GET</span> /api/progress
+            </div>
+            <p>進捗情報を取得</p>
+            
+            <div class="api-endpoint">
+                <span class="method post">POST</span> /api/chat/analyze
+            </div>
+            <p>チャット内容を解析してドキュメントを更新</p>
+            
+            <div class="api-endpoint">
+                <span class="method get">GET</span> /api/documents/{type}
+            </div>
+            <p>指定されたタイプのドキュメントを取得</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>エンドポイント</th>
+                        <th>メソッド</th>
+                        <th>説明</th>
+                        <th>ステータス</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>/api/progress</td>
+                        <td>GET</td>
+                        <td>進捗情報の取得</td>
+                        <td><span class="status-badge planned">計画中</span></td>
+                    </tr>
+                    <tr>
+                        <td>/api/chat/analyze</td>
+                        <td>POST</td>
+                        <td>チャット解析</td>
+                        <td><span class="status-badge planned">計画中</span></td>
+                    </tr>
+                    <tr>
+                        <td>/api/documents/{type}</td>
+                        <td>GET</td>
+                        <td>ドキュメント取得</td>
+                        <td><span class="status-badge planned">計画中</span></td>
+                    </tr>
+                    <tr>
+                        <td>/api/backup</td>
+                        <td>POST</td>
+                        <td>バックアップ実行</td>
+                        <td><span class="status-badge planned">計画中</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>4. データモデル</h2>
+            
+            <h3>主要エンティティ</h3>
+            
+            <div class="feature-item">
+                <h4>Progress (進捗)</h4>
+                <pre>{
+    "id": "string",
+    "type": "feature | environment | test",
+    "percentage": number,
+    "phase": "planning | development | testing | completed",
+    "updatedAt": "datetime",
+    "details": {}
+}</pre>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Document (ドキュメント)</h4>
+                <pre>{
+    "id": "string",
+    "type": "feature | environment | test",
+    "content": "string",
+    "version": "string",
+    "lastModified": "datetime",
+    "autoGenerated": boolean
+}</pre>
+            </div>
+            
+            <div class="feature-item">
+                <h4>ChatHistory (チャット履歴)</h4>
+                <pre>{
+    "id": "string",
+    "timestamp": "datetime",
+    "role": "user | assistant",
+    "content": "string",
+    "analyzed": boolean,
+    "extractedFeatures": []
+}</pre>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>5. 画面設計</h2>
+            
+            <h3>ダッシュボード</h3>
+            <div class="diagram">
+                <p>📊 進捗グラフ | 📝 現在のフェーズ | 📁 ドキュメントリンク | 🔄 更新状況</p>
+            </div>
+            
+            <h3>各設計書画面</h3>
+            <ul>
+                <li>機能設計書: 機能一覧、API設計、データモデル</li>
+                <li>環境設計書: システム構成、ディレクトリ構造、依存関係</li>
+                <li>テスト仕様書: テストケース、実行結果、カバレッジ</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>6. 非機能要件</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>要件</th>
+                        <th>備考</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>パフォーマンス</td>
+                        <td>ドキュメント更新: 5秒以内</td>
+                        <td>チャット解析を含む</td>
+                    </tr>
+                    <tr>
+                        <td>可用性</td>
+                        <td>クラッシュ後の自動復旧</td>
+                        <td>2時間ごとのバックアップ</td>
+                    </tr>
+                    <tr>
+                        <td>セキュリティ</td>
+                        <td>ローカル環境での動作</td>
+                        <td>外部通信なし</td>
+                    </tr>
+                    <tr>
+                        <td>互換性</td>
+                        <td>主要ブラウザ対応</td>
+                        <td>Chrome, Firefox, Safari</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // 最終更新日時の設定
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        
+        // 自動更新スクリプトから呼び出される関数
+        function updateFeatureDesign(data) {
+            // 機能の状態を更新
+            if (data.features) {
+                // 機能リストの更新処理
+            }
+            
+            // バージョン情報の更新
+            if (data.version) {
+                document.getElementById('version').textContent = data.version;
+            }
+            
+            // 最終更新日時の更新
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+        }
+    </script>
+</body>
+</html>

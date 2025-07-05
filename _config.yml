@@ -1,0 +1,28 @@
+# Jekyll configuration for GitHub Pages
+theme: null
+title: 開発プロジェクト管理システム
+description: 開発ドキュメントの自動生成・管理・可視化ツール
+baseurl: ""
+url: ""
+
+# Build settings
+markdown: kramdown
+exclude:
+  - scripts/
+  - test/
+  - backups/
+  - "*.py"
+  - "*.sh"
+  - "*.json"
+  - "*.log"
+  - ".git*"
+  - "CLAUDE.md"
+  - "*.backup"
+
+# Include settings
+include:
+  - docs/
+  - index.html
+
+# Plugins
+plugins: []
