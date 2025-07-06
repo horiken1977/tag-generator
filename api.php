@@ -71,8 +71,11 @@ function fetchGoogleSheetsData($url) {
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
-                'header' => 'User-Agent: TagGenerator/1.0',
-                'timeout' => 10
+                'header' => [
+                    'User-Agent: TagGenerator/1.0',
+                    'Accept: text/csv,*/*'
+                ],
+                'timeout' => 15
             ]
         ]);
         
@@ -82,20 +85,62 @@ function fetchGoogleSheetsData($url) {
             throw new Exception('スプレッドシートにアクセスできません。公開設定を確認してください。');
         }
         
-        // CSVを解析
-        $lines = array_filter(explode("\n", $csvData));
-        if (count($lines) < 2) {
-            throw new Exception('スプレッドシートが空または形式が正しくありません。');
+        // 文字エンコーディングをUTF-8に統一
+        $csvData = mb_convert_encoding($csvData, 'UTF-8', 'auto');
+        
+        // CSVを適切に解析
+        $csvData = str_replace(["\r\n", "\r"], "\n", $csvData); // 改行コードを統一
+        $lines = explode("\n", $csvData);
+        
+        // 空行を除去
+        $lines = array_filter($lines, function($line) {
+            return trim($line) !== '';
+        });
+        
+        if (count($lines) < 1) {
+            throw new Exception('スプレッドシートが空です。');
         }
         
-        // ヘッダー行を取得
-        $headers = str_getcsv($lines[0]);
+        // ヘッダー行を取得（最初の行）
+        $headerLine = $lines[0];
+        
+        // CSV解析を改善（引用符やカンマを含む列名に対応）
+        $headers = str_getcsv($headerLine, ',', '"', '\\');
+        
+        // ヘッダーの前後の空白と改行文字を除去
+        $headers = array_map(function($header) {
+            return preg_replace('/[\r\n]+/', ' ', trim($header));
+        }, $headers);
+        
+        // 空のヘッダーを除去
+        $headers = array_filter($headers, function($header) {
+            return $header !== '';
+        });
+        
+        // サンプルデータを取得（2行目があれば）
+        $sampleData = null;
+        if (count($lines) > 1) {
+            $sampleData = str_getcsv($lines[1]);
+            $sampleData = array_map('trim', $sampleData);
+        }
+        
+        // デバッグ情報をログに記録
+        error_log("CSV Headers count: " . count($headers));
+        error_log("CSV Headers: " . json_encode($headers, JSON_UNESCAPED_UNICODE));
+        error_log("CSV Lines count: " . count($lines));
+        error_log("First line raw: " . $lines[0]);
+        error_log("Headers after processing: " . print_r($headers, true));
         
         return [
             'sheet_id' => $sheetId,
-            'headers' => $headers,
+            'headers' => array_values($headers), // インデックスを再整理
             'rows' => count($lines) - 1,
-            'sample_data' => isset($lines[1]) ? str_getcsv($lines[1]) : null
+            'sample_data' => $sampleData,
+            'debug_info' => [
+                'raw_header_line' => $lines[0],
+                'total_lines' => count($lines),
+                'csv_size' => strlen($csvData)
+            ]
         ];
     }
     

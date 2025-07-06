@@ -351,12 +351,27 @@
                 if (data.success) {
                     columnHeaders = data.columns || [];
                     
+                    // デバッグ情報を表示
+                    const debugInfo = data.debug_info ? `
+                        <details style="margin-top: 10px; opacity: 0.8;">
+                            <summary>デバッグ情報</summary>
+                            <div style="font-size: 12px; background: rgba(0,0,0,0.1); padding: 5px; border-radius: 3px; margin-top: 5px;">
+                                生データ: ${data.debug_info.raw_header_line}<br>
+                                総行数: ${data.debug_info.total_lines}<br>
+                                CSVサイズ: ${data.debug_info.csv_size}バイト<br>
+                                検出された列数: ${columnHeaders.length}
+                            </div>
+                        </details>
+                    ` : '';
+                    
                     statusDiv.innerHTML = `
                         <div class="status success">
                             ✅ 接続成功<br>
                             シートID: ${data.sheet_id}<br>
                             データ行数: ${data.rows}行<br>
-                            列: ${data.columns.join(', ')}<br>
+                            検出された列数: ${columnHeaders.length}個<br>
+                            列名: ${columnHeaders.join(', ')}<br>
+                            ${debugInfo}
                         </div>
                     `;
                     
@@ -364,6 +379,8 @@
                     if (columnHeaders.length > 0) {
                         setupColumnMapping(columnHeaders);
                         document.getElementById('process-btn').disabled = false;
+                    } else {
+                        statusDiv.innerHTML += `<div class="status warning">⚠️ 列が検出されませんでした。スプレッドシートの形式を確認してください。</div>`;
                     }
                 } else {
                     statusDiv.innerHTML = `<div class="status error">❌ ${data.error}</div>`;
