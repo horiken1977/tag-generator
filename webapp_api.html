@@ -527,48 +527,87 @@
                 
                 const sheetsData = sheetsResponse;
                 
-                // Stage 2: Lightweight batch processing
-                const maxLightweightItems = Math.min(sheetsData.data.length, 50); // 最大50件に制限
-                const lightweightDataset = sheetsData.data.slice(0, maxLightweightItems);
-                
+                // Stage 2: Multiple micro-batch processing
                 statusText.innerHTML = `
                     <div class="status info">
-                        🚀 ステップ2/5: 軽量バッチ処理中...<br>
-                        <small>選択された${maxLightweightItems}件の動画をタイトル・スキル・説明文で高速処理</small>
+                        🚀 ステップ2/5: マイクロバッチ処理中...<br>
+                        <small>データを小分けして安全に処理中（最大2件ずつ）</small>
                     </div>
                 `;
                 progressBar.style.width = '30%';
                 
-                // データサイズをチェック
-                const requestData = {
-                    data: lightweightDataset,
-                    ai_engine: document.getElementById('ai-engine').value,
-                    batch_size: 5, // 小さなバッチサイズ
-                    quality: document.getElementById('quality').value,
-                    processing_mode: 'lightweight',
-                    use_real_ai: true
-                };
+                // 非常に小さなバッチで分割処理
+                const microBatchSize = 2;
+                const maxTotalItems = Math.min(sheetsData.data.length, 10); // 最大10件に制限
+                const allLightweightResults = [];
+                let totalProcessingTime = 0;
                 
-                const requestSize = JSON.stringify(requestData).length;
-                console.log('Lightweight processing request size:', requestSize, 'bytes');
-                
-                if (requestSize > 400 * 1024) { // 400KB制限
-                    // さらにデータを削減
-                    requestData.data = lightweightDataset.slice(0, 25);
+                for (let i = 0; i < maxTotalItems; i += microBatchSize) {
+                    const microBatch = sheetsData.data.slice(i, Math.min(i + microBatchSize, maxTotalItems));
+                    
+                    // データサイズを最小化
+                    const optimizedBatch = microBatch.map(item => ({
+                        title: (item.title || '').substring(0, 20),      // 20文字に制限
+                        skill: (item.skill || '').substring(0, 15),      // 15文字に制限
+                        description: (item.description || '').substring(0, 30) // 30文字に制限
+                    }));
+                    
+                    const requestData = {
+                        data: optimizedBatch,
+                        ai_engine: document.getElementById('ai-engine').value,
+                        batch_size: microBatchSize,
+                        quality: 'fast', // 強制的に高速処理
+                        processing_mode: 'lightweight',
+                        use_real_ai: true
+                    };
+                    
+                    const requestSize = JSON.stringify(requestData).length;
+                    console.log(`Micro-batch ${Math.floor(i/microBatchSize) + 1} size:`, requestSize, 'bytes');
+                    
+                    // 10KB制限で極めて保守的に
+                    if (requestSize > 10 * 1024) {
+                        console.warn('Micro-batch still too large, skipping...');
+                        continue;
+                    }
+                    
                     statusText.innerHTML = `
-                        <div class="status warning">
-                            🚀 ステップ2/5: 軽量バッチ処理中...<br>
-                            <small>データサイズ制限により25件で処理中（サーバー負荷軽減のため）</small>
+                        <div class="status info">
+                            🚀 ステップ2/5: マイクロバッチ処理中...<br>
+                            <small>バッチ ${Math.floor(i/microBatchSize) + 1}/${Math.ceil(maxTotalItems/microBatchSize)} を処理中（${microBatch.length}件）</small>
                         </div>
                     `;
+                    
+                    try {
+                        const microResponse = await callAPI('ai_process', {
+                            method: 'POST',
+                            body: JSON.stringify(requestData)
+                        });
+                        
+                        if (microResponse.success && microResponse.results) {
+                            allLightweightResults.push(...microResponse.results);
+                            totalProcessingTime += microResponse.processing_time || 0;
+                        }
+                        
+                        // バッチ間の休憩
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                    } catch (batchError) {
+                        console.warn(`Micro-batch ${Math.floor(i/microBatchSize) + 1} failed:`, batchError.message);
+                        // エラーが発生してもスキップして続行
+                        continue;
+                    }
                 }
                 
-                const lightweightResponse = await callAPI('ai_process', {
-                    method: 'POST',
-                    body: JSON.stringify(requestData)
-                });
-                
-                const lightweightData = lightweightResponse;
+                // 結果をまとめる
+                const lightweightData = {
+                    success: true,
+                    results: allLightweightResults,
+                    processed_count: allLightweightResults.length,
+                    total_tags_generated: allLightweightResults.reduce((sum, result) => sum + (result.generated_tags?.length || 0), 0),
+                    processing_time: totalProcessingTime,
+                    ai_mode: 'simulation', // マイクロバッチはシミュレーションモード
+                    processing_mode: 'lightweight'
+                };
                 
                 // Stage 3: Select important videos for detailed processing
                 statusText.innerHTML = `

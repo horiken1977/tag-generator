@@ -159,7 +159,7 @@ function fetchGoogleSheetsData($url) {
 function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI) {
     $results = [];
     $processedCount = 0;
-    $maxItemsPerBatch = 5; // さらに小さなバッチサイズ
+    $maxItemsPerBatch = 2; // 極小バッチサイズ
     
     // データを非常に小さなチャンクに分割
     $totalItems = count($videoData);
@@ -170,9 +170,9 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
         foreach ($chunk as $video) {
             // 軽量データのみを使用（文字起こしを除外）
             $lightweightVideo = [
-                'title' => substr($video['title'] ?? '', 0, 100), // タイトルも100文字に制限
-                'skill' => substr($video['skill'] ?? '', 0, 50),   // スキルも50文字に制限
-                'description' => substr($video['description'] ?? '', 0, 200) // 説明も200文字に制限
+                'title' => substr($video['title'] ?? '', 0, 30), // タイトルを30文字に制限
+                'skill' => substr($video['skill'] ?? '', 0, 20),   // スキルを20文字に制限
+                'description' => substr($video['description'] ?? '', 0, 50) // 説明を50文字に制限
                 // 文字起こしは意図的に除外
             ];
             
@@ -728,15 +728,16 @@ try {
                 $requestSize = strlen(json_encode($data));
                 error_log("AI Process request size: " . $requestSize . " bytes");
                 
-                if ($requestSize > 512 * 1024) { // 512KB制限
-                    sendJsonResponse(['success' => false, 'error' => 'リクエストサイズが大きすぎます。データを分割してください。'], 413);
+                if ($requestSize > 16 * 1024) { // 16KB制限（極めて保守的）
+                    error_log("Request too large: " . $requestSize . " bytes, max allowed: 16KB");
+                    sendJsonResponse(['success' => false, 'error' => 'リクエストサイズが制限を超えています。より小さなデータで再試行してください。'], 413);
                     break;
                 }
                 
                 $videoData = $data['data'] ?? [];
                 $aiEngine = $data['ai_engine'] ?? 'openai';
                 $processingMode = $data['processing_mode'] ?? 'lightweight';
-                $batchSize = intval($data['batch_size'] ?? 5); // デフォルトバッチサイズを5に縮小
+                $batchSize = intval($data['batch_size'] ?? 2); // デフォルトバッチサイズを2に縮小
                 $quality = $data['quality'] ?? 'balanced';
                 $useRealAI = $data['use_real_ai'] ?? false;
                 
@@ -750,10 +751,10 @@ try {
                 switch ($processingMode) {
                     case 'lightweight':
                         // ステップ1: 軽量バッチ処理（タイトル + スキル + 説明文のみ）
-                        if (count($videoData) > 50) {
-                            // 大量データの場合は最初の50件のみ処理
-                            $videoData = array_slice($videoData, 0, 50);
-                            error_log("Large dataset detected, processing first 50 items only");
+                        if (count($videoData) > 10) {
+                            // 大量データの場合は最初の10件のみ処理
+                            $videoData = array_slice($videoData, 0, 10);
+                            error_log("Large dataset detected, processing first 10 items only");
                         }
                         $results = processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI);
                         $processedCount = count($results);
