@@ -596,10 +596,17 @@ try {
     // POSTリクエストの処理
     if ($method === 'POST') {
         $input = file_get_contents('php://input');
+        error_log("POST Input length: " . strlen($input));
+        error_log("POST Input preview: " . substr($input, 0, 200));
+        error_log("Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+        error_log("Request Method: " . $_SERVER['REQUEST_METHOD']);
+        
         $data = json_decode($input, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            sendJsonResponse(['error' => 'Invalid JSON'], 400);
+            error_log("JSON Parse Error: " . json_last_error_msg());
+            error_log("JSON Error Code: " . json_last_error());
+            sendJsonResponse(['error' => 'Invalid JSON: ' . json_last_error_msg()], 400);
         }
         
         $action = $_GET['action'] ?? '';
@@ -727,6 +734,8 @@ try {
                 // リクエストサイズの事前チェック
                 $requestSize = strlen(json_encode($data));
                 error_log("AI Process request size: " . $requestSize . " bytes");
+                error_log("AI Process data keys: " . json_encode(array_keys($data)));
+                error_log("AI Process data structure: " . json_encode($data, JSON_UNESCAPED_UNICODE));
                 
                 if ($requestSize > 16 * 1024) { // 16KB制限（極めて保守的）
                     error_log("Request too large: " . $requestSize . " bytes, max allowed: 16KB");
@@ -839,6 +848,9 @@ try {
     
 } catch (Exception $e) {
     error_log("API Error: " . $e->getMessage());
-    sendJsonResponse(['error' => $e->getMessage()], 500);
+    error_log("API Error file: " . $e->getFile());
+    error_log("API Error line: " . $e->getLine());
+    error_log("API Error trace: " . $e->getTraceAsString());
+    sendJsonResponse(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 500);
 }
 ?>

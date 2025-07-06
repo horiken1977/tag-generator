@@ -295,10 +295,24 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const responseText = await response.text();
+                    console.error('HTTP Error Response:', response.status, responseText);
+                    throw new Error(`HTTP error! status: ${response.status}, response: ${responseText.substring(0, 200)}`);
                 }
                 
-                return await response.json();
+                const responseText = await response.text();
+                console.log('Raw API Response:', responseText.substring(0, 500));
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    console.error('Response text:', responseText);
+                    throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+                }
+                
+                return data;
             } catch (error) {
                 console.error('API call error:', error);
                 throw error;
