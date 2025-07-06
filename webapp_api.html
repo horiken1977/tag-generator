@@ -119,6 +119,7 @@
             border-radius: 50%;
             border-top-color: #fff;
             animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
         }
         @keyframes spin {
             to { transform: rotate(360deg); }
@@ -476,6 +477,8 @@
             }
             
             isProcessing = true;
+            
+            // DOM要素を安全に取得
             const statusDiv = document.getElementById('processing-status');
             const progressBar = document.getElementById('progress-bar');
             const statusText = document.getElementById('status-text');
@@ -483,14 +486,35 @@
             const processBtn = document.getElementById('process-btn');
             const loading = document.getElementById('process-loading');
             
+            // 要素の存在確認
+            if (!statusDiv || !progressBar || !statusText || !resultsDiv || !processBtn) {
+                alert('UI要素の初期化に失敗しました。ページを再読み込みしてください。');
+                isProcessing = false;
+                return;
+            }
+            
+            // UI状態を更新
             processBtn.disabled = true;
-            loading.classList.remove('hidden');
+            processBtn.innerHTML = `
+                <span class="loading"></span>
+                処理中...
+            `;
+            
+            if (loading) {
+                loading.classList.remove('hidden');
+            }
+            
             statusDiv.classList.remove('hidden');
             resultsDiv.classList.add('hidden');
             
             try {
                 // Step 1: Get data from sheets
-                statusText.textContent = 'Google Sheetsからデータを読み込み中...';
+                statusText.innerHTML = `
+                    <div class="status info">
+                        📊 Google Sheetsからデータを読み込み中...<br>
+                        <small>スプレッドシートに接続してデータを取得しています</small>
+                    </div>
+                `;
                 progressBar.style.width = '20%';
                 
                 const sheetsResponse = await callAPI('sheets_data', {
@@ -504,7 +528,12 @@
                 const sheetsData = sheetsResponse;
                 
                 // Step 2: Process with AI
-                statusText.textContent = 'AI処理中...';
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🤖 AI処理中...<br>
+                        <small>選択されたAIエンジンでタグを生成しています（${sheetsData.total_rows || '複数'}件のデータを処理中）</small>
+                    </div>
+                `;
                 progressBar.style.width = '60%';
                 
                 const aiResponse = await callAPI('ai_process', {
@@ -521,7 +550,12 @@
                 const aiData = aiResponse;
                 
                 // Step 3: Optimize tags
-                statusText.textContent = 'タグ最適化中...';
+                statusText.innerHTML = `
+                    <div class="status info">
+                        ⚙️ タグ最適化中...<br>
+                        <small>生成されたタグを分析して重複を除去し、最適化しています</small>
+                    </div>
+                `;
                 progressBar.style.width = '90%';
                 
                 const allTags = aiData.results.map(item => item.generated_tags);
@@ -536,7 +570,12 @@
                 const optimizeData = optimizeResponse;
                 
                 // Complete
-                statusText.textContent = '完了!';
+                statusText.innerHTML = `
+                    <div class="status success">
+                        🎉 処理完了！<br>
+                        <small>結果を表示しています...</small>
+                    </div>
+                `;
                 progressBar.style.width = '100%';
                 
                 // Show results
@@ -544,17 +583,39 @@
                     displayResults(sheetsData, aiData, optimizeData);
                     statusDiv.classList.add('hidden');
                     resultsDiv.classList.remove('hidden');
+                    
+                    // ボタンを元に戻す
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = `
+                        <span id="process-loading" class="loading hidden"></span>
+                        タグ生成開始
+                    `;
                 }, 1000);
                 
             } catch (error) {
-                statusText.textContent = `エラー: ${error.message}`;
+                console.error('Processing error:', error);
+                statusText.innerHTML = `
+                    <div class="status error">
+                        ❌ エラーが発生しました: ${error.message}<br>
+                        <small>詳細はコンソールログを確認してください</small>
+                    </div>
+                `;
+                progressBar.style.width = '0%';
+                
                 setTimeout(() => {
                     statusDiv.classList.add('hidden');
-                }, 3000);
+                }, 5000);
             } finally {
                 isProcessing = false;
                 processBtn.disabled = false;
-                loading.classList.add('hidden');
+                processBtn.innerHTML = `
+                    <span id="process-loading" class="loading hidden"></span>
+                    タグ生成開始
+                `;
+                
+                if (loading) {
+                    loading.classList.add('hidden');
+                }
             }
         }
         
