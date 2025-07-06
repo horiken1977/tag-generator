@@ -528,24 +528,44 @@
                 const sheetsData = sheetsResponse;
                 
                 // Stage 2: Lightweight batch processing
+                const maxLightweightItems = Math.min(sheetsData.data.length, 50); // 最大50件に制限
+                const lightweightDataset = sheetsData.data.slice(0, maxLightweightItems);
+                
                 statusText.innerHTML = `
                     <div class="status info">
                         🚀 ステップ2/5: 軽量バッチ処理中...<br>
-                        <small>全${sheetsData.total_rows}件の動画をタイトル・スキル・説明文で高速処理</small>
+                        <small>選択された${maxLightweightItems}件の動画をタイトル・スキル・説明文で高速処理</small>
                     </div>
                 `;
                 progressBar.style.width = '30%';
                 
+                // データサイズをチェック
+                const requestData = {
+                    data: lightweightDataset,
+                    ai_engine: document.getElementById('ai-engine').value,
+                    batch_size: 5, // 小さなバッチサイズ
+                    quality: document.getElementById('quality').value,
+                    processing_mode: 'lightweight',
+                    use_real_ai: true
+                };
+                
+                const requestSize = JSON.stringify(requestData).length;
+                console.log('Lightweight processing request size:', requestSize, 'bytes');
+                
+                if (requestSize > 400 * 1024) { // 400KB制限
+                    // さらにデータを削減
+                    requestData.data = lightweightDataset.slice(0, 25);
+                    statusText.innerHTML = `
+                        <div class="status warning">
+                            🚀 ステップ2/5: 軽量バッチ処理中...<br>
+                            <small>データサイズ制限により25件で処理中（サーバー負荷軽減のため）</small>
+                        </div>
+                    `;
+                }
+                
                 const lightweightResponse = await callAPI('ai_process', {
                     method: 'POST',
-                    body: JSON.stringify({
-                        data: sheetsData.data,
-                        ai_engine: document.getElementById('ai-engine').value,
-                        batch_size: document.getElementById('batch-size').value,
-                        quality: document.getElementById('quality').value,
-                        processing_mode: 'lightweight',
-                        use_real_ai: true
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 const lightweightData = lightweightResponse;
@@ -554,16 +574,17 @@
                 statusText.innerHTML = `
                     <div class="status info">
                         🎯 ステップ3/5: 重要動画を選択中...<br>
-                        <small>タグ頻度分析により上位50件を選択して詳細処理対象を決定</small>
+                        <small>タグ頻度分析により上位動画を選択して詳細処理対象を決定</small>
                     </div>
                 `;
                 progressBar.style.width = '50%';
                 
-                // 重要動画の選択（タグ数が多い動画を上位50件選択）
+                // 重要動画の選択（タグ数が多い動画を上位から選択）
+                const maxDetailedItems = Math.min(lightweightData.results.length, 15); // 最大15件に制限
                 const sortedVideos = lightweightData.results
                     .map((result, index) => ({ ...result, originalIndex: index }))
                     .sort((a, b) => b.generated_tags.length - a.generated_tags.length)
-                    .slice(0, 50);
+                    .slice(0, maxDetailedItems);
                 
                 const importantVideos = sortedVideos.map(item => sheetsData.data[item.originalIndex]);
                 
@@ -635,17 +656,38 @@
                 
             } catch (error) {
                 console.error('Processing error:', error);
+                
+                let errorMessage = error.message;
+                let helpText = '詳細はコンソールログを確認してください';
+                
+                if (error.message.includes('HTTP error! status: 403')) {
+                    errorMessage = 'サーバーがリクエストを拒否しました';
+                    helpText = 'データサイズが大きすぎる可能性があります。より少ないデータで再試行してください。';
+                } else if (error.message.includes('HTTP error! status: 413')) {
+                    errorMessage = 'リクエストサイズが制限を超えています';
+                    helpText = 'データを分割して処理する必要があります。管理者にお問い合わせください。';
+                } else if (error.message.includes('HTTP error! status: 504')) {
+                    errorMessage = '処理がタイムアウトしました';
+                    helpText = 'データ量が多すぎます。バッチサイズを小さくして再試行してください。';
+                }
+                
                 statusText.innerHTML = `
                     <div class="status error">
-                        ❌ エラーが発生しました: ${error.message}<br>
-                        <small>詳細はコンソールログを確認してください</small>
+                        ❌ ${errorMessage}<br>
+                        <small>${helpText}</small><br>
+                        <small style="margin-top: 10px; display: block;">
+                            <strong>対処方法:</strong><br>
+                            1. ページを再読み込みして再試行<br>
+                            2. より小さなデータセットで試行<br>
+                            3. 処理品質を「高速処理」に変更
+                        </small>
                     </div>
                 `;
                 progressBar.style.width = '0%';
                 
                 setTimeout(() => {
                     statusDiv.classList.add('hidden');
-                }, 5000);
+                }, 10000);
             } finally {
                 isProcessing = false;
                 processBtn.disabled = false;
