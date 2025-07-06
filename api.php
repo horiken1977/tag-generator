@@ -24,25 +24,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // .envファイルの読み込み
 function loadEnv() {
+    error_log("loadEnv: Starting to load environment variables");
     $envVars = [];
-    if (file_exists(__DIR__ . '/.env')) {
-        $envLines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $envPath = __DIR__ . '/.env';
+    error_log("loadEnv: Looking for .env file at: $envPath");
+    
+    if (file_exists($envPath)) {
+        error_log("loadEnv: .env file exists");
+        $envLines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($envLines === false) {
+            error_log("loadEnv: Failed to read .env file");
+            return $envVars;
+        }
+        error_log("loadEnv: Read " . count($envLines) . " lines from .env file");
+        
         foreach ($envLines as $line) {
             if (strpos(trim($line), '#') === 0) continue;
             if (strpos($line, '=') !== false) {
                 list($key, $value) = explode('=', $line, 2);
                 $envVars[trim($key)] = trim($value);
+                error_log("loadEnv: Loaded key: " . trim($key));
             }
         }
+    } else {
+        error_log("loadEnv: .env file does not exist");
     }
+    
+    error_log("loadEnv: Completed, loaded " . count($envVars) . " variables");
     return $envVars;
 }
 
 // APIキー取得
 function getApiKey($provider) {
+    error_log("getApiKey: Requested provider: $provider");
     static $envVars = null;
     if ($envVars === null) {
+        error_log("getApiKey: Loading environment variables");
         $envVars = loadEnv();
+        error_log("getApiKey: Loaded " . count($envVars) . " environment variables");
     }
     
     $keyMap = [
@@ -51,13 +70,23 @@ function getApiKey($provider) {
         'gemini' => 'GEMINI_API_KEY'
     ];
     
-    return $envVars[$keyMap[$provider]] ?? '';
+    $keyName = $keyMap[$provider] ?? '';
+    error_log("getApiKey: Looking for key: $keyName");
+    $key = $envVars[$keyName] ?? '';
+    error_log("getApiKey: Key found: " . ($key ? 'YES' : 'NO'));
+    
+    return $key;
 }
 
 // JSON レスポンス送信
 function sendJsonResponse($data, $statusCode = 200) {
+    error_log("sendJsonResponse: Sending response with status code: $statusCode");
+    error_log("sendJsonResponse: Response data size: " . strlen(json_encode($data)));
     http_response_code($statusCode);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    $jsonResponse = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    error_log("sendJsonResponse: JSON encoded successfully, size: " . strlen($jsonResponse));
+    echo $jsonResponse;
+    error_log("sendJsonResponse: Response sent, exiting");
     exit;
 }
 
@@ -157,17 +186,21 @@ function fetchGoogleSheetsData($url) {
 
 // ステップ1: 軽量バッチ処理（プログレッシブ処理）
 function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI) {
+    error_log("processLightweightBatch: Starting with " . count($videoData) . " items");
     $results = [];
     $processedCount = 0;
     $maxItemsPerBatch = 2; // 極小バッチサイズ
     
     // データを非常に小さなチャンクに分割
     $totalItems = count($videoData);
+    error_log("processLightweightBatch: Total items to process: $totalItems");
     
     for ($i = 0; $i < $totalItems; $i += $maxItemsPerBatch) {
+        error_log("processLightweightBatch: Processing batch starting at index $i");
         $chunk = array_slice($videoData, $i, $maxItemsPerBatch);
         
-        foreach ($chunk as $video) {
+        foreach ($chunk as $index => $video) {
+            error_log("processLightweightBatch: Processing item $index");
             // 軽量データのみを使用（文字起こしを除外）
             $lightweightVideo = [
                 'title' => substr($video['title'] ?? '', 0, 30), // タイトルを30文字に制限
@@ -175,8 +208,17 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
                 'description' => substr($video['description'] ?? '', 0, 50) // 説明を50文字に制限
                 // 文字起こしは意図的に除外
             ];
+            error_log("processLightweightBatch: Lightweight video data: " . json_encode($lightweightVideo, JSON_UNESCAPED_UNICODE));
             
-            $tags = callAIAPI($aiEngine, '', $lightweightVideo);
+            error_log("processLightweightBatch: About to call AI API");
+            try {
+                $tags = callAIAPI($aiEngine, '', $lightweightVideo);
+                error_log("processLightweightBatch: AI API returned " . count($tags) . " tags");
+            } catch (Exception $e) {
+                error_log("processLightweightBatch: AI API error: " . $e->getMessage());
+                $tags = []; // エラーの場合は空配列
+            }
+            
             $results[] = [
                 'title' => $video['title'] ?? '',
                 'generated_tags' => $tags,
@@ -186,6 +228,7 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
             ];
             
             $processedCount++;
+            error_log("processLightweightBatch: Processed count: $processedCount");
             
             // レート制限対策とメモリ管理
             if ($useRealAI) {
@@ -193,7 +236,9 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
             }
             
             // メモリ使用量の監視
-            if (memory_get_usage() > 128 * 1024 * 1024) { // 128MBで制限
+            $memoryUsage = memory_get_usage();
+            error_log("processLightweightBatch: Memory usage: " . ($memoryUsage / 1024 / 1024) . " MB");
+            if ($memoryUsage > 128 * 1024 * 1024) { // 128MBで制限
                 error_log("Memory limit reached, processed: $processedCount items");
                 break 2;
             }
@@ -203,6 +248,7 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
         usleep(50000); // 0.05秒
     }
     
+    error_log("processLightweightBatch: Completed, returning " . count($results) . " results");
     return $results;
 }
 
@@ -357,9 +403,12 @@ function findSimilarTags($baseTag, $allTags) {
 
 // AI API呼び出し
 function callAIAPI($provider, $prompt, $videoData) {
+    error_log("callAIAPI: Starting with provider: $provider");
     $apiKey = getApiKey($provider);
+    error_log("callAIAPI: API key retrieved: " . ($apiKey ? 'YES' : 'NO'));
     if (!$apiKey) {
         // APIキーがない場合はシミュレーションモードで動作
+        error_log("callAIAPI: Using simulation mode");
         return generateSimulatedTags($videoData);
     }
     
@@ -402,8 +451,10 @@ function callAIAPI($provider, $prompt, $videoData) {
 
 // シミュレーションタグ生成
 function generateSimulatedTags($videoData) {
+    error_log("generateSimulatedTags: Starting simulation mode");
     $title = $videoData['title'] ?? '';
     $skill = $videoData['skill'] ?? '';
+    error_log("generateSimulatedTags: Title: $title, Skill: $skill");
     
     $tags = [];
     
@@ -426,7 +477,9 @@ function generateSimulatedTags($videoData) {
     // 基本的なビジネスタグを追加
     $tags = array_merge($tags, ['ビジネススキル', '職場効率']);
     
-    return array_unique(array_slice($tags, 0, 15));
+    $finalTags = array_unique(array_slice($tags, 0, 15));
+    error_log("generateSimulatedTags: Generated " . count($finalTags) . " tags: " . json_encode($finalTags, JSON_UNESCAPED_UNICODE));
+    return $finalTags;
 }
 
 // OpenAI API呼び出し
@@ -760,12 +813,15 @@ try {
                 switch ($processingMode) {
                     case 'lightweight':
                         // ステップ1: 軽量バッチ処理（タイトル + スキル + 説明文のみ）
+                        error_log("Starting lightweight processing for " . count($videoData) . " items");
                         if (count($videoData) > 10) {
                             // 大量データの場合は最初の10件のみ処理
                             $videoData = array_slice($videoData, 0, 10);
                             error_log("Large dataset detected, processing first 10 items only");
                         }
+                        error_log("About to call processLightweightBatch");
                         $results = processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI);
+                        error_log("processLightweightBatch completed, got " . count($results) . " results");
                         $processedCount = count($results);
                         break;
                         
@@ -796,7 +852,7 @@ try {
                 $apiKey = getApiKey($aiEngine);
                 $aiMode = $apiKey ? 'real' : 'simulation';
                 
-                sendJsonResponse([
+                $responseData = [
                     'success' => true,
                     'results' => $results,
                     'total_tags_generated' => array_sum(array_map(function($r) { 
@@ -810,7 +866,12 @@ try {
                     'batch_size' => $batchSize,
                     'quality' => $quality,
                     'request_size' => $requestSize
-                ]);
+                ];
+                
+                error_log("ai_process: About to send response with " . count($results) . " results");
+                error_log("ai_process: Response data keys: " . json_encode(array_keys($responseData)));
+                
+                sendJsonResponse($responseData);
                 break;
                 
             case 'tags_optimize':
