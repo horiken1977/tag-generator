@@ -155,47 +155,205 @@ function fetchGoogleSheetsData($url) {
     throw new Exception('有効なGoogle SheetsのURLではありません。');
 }
 
-// AI API呼び出し（シミュレーション）
+// AI API呼び出し
 function callAIAPI($provider, $prompt, $videoData) {
-    // 実際のAPI呼び出しの代わりにシミュレーション
+    $apiKey = getApiKey($provider);
+    if (!$apiKey) {
+        // APIキーがない場合はシミュレーションモードで動作
+        return generateSimulatedTags($videoData);
+    }
+    
+    // プロンプトの作成
+    $systemPrompt = "あなたはマーケティング教育動画のタグ生成専門家です。動画の内容を分析し、検索性と分類に最適な15個のタグを生成してください。";
+    
+    $userPrompt = "以下の動画情報から、最も適切なタグを15個生成してください。\n\n";
+    $userPrompt .= "タイトル: " . ($videoData['title'] ?? '') . "\n";
+    $userPrompt .= "スキル: " . ($videoData['skill'] ?? '') . "\n";
+    
+    if (!empty($videoData['description'])) {
+        $userPrompt .= "説明: " . $videoData['description'] . "\n";
+    }
+    if (!empty($videoData['summary'])) {
+        $userPrompt .= "要約: " . $videoData['summary'] . "\n";
+    }
+    if (!empty($videoData['transcript']) && strlen($videoData['transcript']) < 2000) {
+        $userPrompt .= "内容抜粋: " . substr($videoData['transcript'], 0, 2000) . "\n";
+    }
+    
+    $userPrompt .= "\nタグは日本語で、具体的かつ検索しやすい形式で生成してください。カンマ区切りで出力してください。";
+    
+    try {
+        switch ($provider) {
+            case 'openai':
+                return callOpenAIForTags($apiKey, $systemPrompt, $userPrompt);
+            case 'claude':
+                return callClaudeForTags($apiKey, $systemPrompt, $userPrompt);
+            case 'gemini':
+                return callGeminiForTags($apiKey, $userPrompt);
+            default:
+                return generateSimulatedTags($videoData);
+        }
+    } catch (Exception $e) {
+        error_log("AI API Error: " . $e->getMessage());
+        // エラーの場合はシミュレーションにフォールバック
+        return generateSimulatedTags($videoData);
+    }
+}
+
+// シミュレーションタグ生成
+function generateSimulatedTags($videoData) {
     $title = $videoData['title'] ?? '';
     $skill = $videoData['skill'] ?? '';
     
     $tags = [];
     
+    // スキルベースのタグ
+    if (!empty($skill)) {
+        $tags[] = $skill;
+    }
+    
     // タイトルベースのタグ生成
     if (strpos($title, 'プレゼン') !== false) {
-        $tags = array_merge($tags, ['プレゼンテーション', 'スピーチ', '発表技法', '聴衆分析']);
+        $tags = array_merge($tags, ['プレゼンテーション', 'スピーチ', '発表技法']);
     }
     if (strpos($title, 'マーケティング') !== false) {
-        $tags = array_merge($tags, ['マーケティング', 'SEO', 'デジタル戦略', 'ブランディング']);
+        $tags = array_merge($tags, ['マーケティング', 'デジタルマーケティング', 'SEO']);
     }
     if (strpos($title, 'チーム') !== false) {
-        $tags = array_merge($tags, ['チームワーク', 'リーダーシップ', 'コラボレーション']);
-    }
-    
-    // スキルベースのタグ
-    if (strpos($skill, 'コミュニケーション') !== false) {
-        $tags = array_merge($tags, ['コミュニケーション', '対人スキル', '説得力']);
-    }
-    
-    // プロバイダー固有のタグ
-    switch ($provider) {
-        case 'openai':
-            $tags = array_merge($tags, ['AI分析', '自然言語処理']);
-            break;
-        case 'claude':
-            $tags = array_merge($tags, ['論理的思考', '構造化分析']);
-            break;
-        case 'gemini':
-            $tags = array_merge($tags, ['多角的視点', '創造的思考']);
-            break;
+        $tags = array_merge($tags, ['チームワーク', 'リーダーシップ']);
     }
     
     // 基本的なビジネスタグを追加
-    $tags = array_merge($tags, ['ビジネススキル', '職場効率', '成果向上']);
+    $tags = array_merge($tags, ['ビジネススキル', '職場効率']);
     
     return array_unique(array_slice($tags, 0, 15));
+}
+
+// OpenAI API呼び出し
+function callOpenAIForTags($apiKey, $systemPrompt, $userPrompt) {
+    $url = 'https://api.openai.com/v1/chat/completions';
+    
+    $headers = [
+        'Authorization: Bearer ' . $apiKey,
+        'Content-Type: application/json'
+    ];
+    
+    $data = [
+        'model' => 'gpt-3.5-turbo',
+        'messages' => [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $userPrompt]
+        ],
+        'max_tokens' => 200,
+        'temperature' => 0.7
+    ];
+    
+    $response = makeHTTPRequest($url, $headers, $data);
+    
+    if (isset($response['choices'][0]['message']['content'])) {
+        $tagsString = $response['choices'][0]['message']['content'];
+        return array_map('trim', explode(',', $tagsString));
+    }
+    
+    throw new Exception('Invalid OpenAI response');
+}
+
+// Claude API呼び出し
+function callClaudeForTags($apiKey, $systemPrompt, $userPrompt) {
+    $url = 'https://api.anthropic.com/v1/messages';
+    
+    $headers = [
+        'x-api-key: ' . $apiKey,
+        'Content-Type: application/json',
+        'anthropic-version: 2023-06-01'
+    ];
+    
+    $data = [
+        'model' => 'claude-3-haiku-20240307',
+        'messages' => [
+            ['role' => 'user', 'content' => $systemPrompt . "\n\n" . $userPrompt]
+        ],
+        'max_tokens' => 200
+    ];
+    
+    $response = makeHTTPRequest($url, $headers, $data);
+    
+    if (isset($response['content'][0]['text'])) {
+        $tagsString = $response['content'][0]['text'];
+        return array_map('trim', explode(',', $tagsString));
+    }
+    
+    throw new Exception('Invalid Claude response');
+}
+
+// Gemini API呼び出し
+function callGeminiForTags($apiKey, $userPrompt) {
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey;
+    
+    $headers = [
+        'Content-Type: application/json'
+    ];
+    
+    $data = [
+        'contents' => [
+            [
+                'parts' => [
+                    ['text' => $userPrompt]
+                ]
+            ]
+        ],
+        'generationConfig' => [
+            'maxOutputTokens' => 200,
+            'temperature' => 0.7
+        ]
+    ];
+    
+    $response = makeHTTPRequest($url, $headers, $data);
+    
+    if (isset($response['candidates'][0]['content']['parts'][0]['text'])) {
+        $tagsString = $response['candidates'][0]['content']['parts'][0]['text'];
+        return array_map('trim', explode(',', $tagsString));
+    }
+    
+    throw new Exception('Invalid Gemini response');
+}
+
+// HTTP リクエスト実行
+function makeHTTPRequest($url, $headers, $data) {
+    $ch = curl_init($url);
+    
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($data),
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => true
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    
+    curl_close($ch);
+    
+    if ($error) {
+        throw new Exception('cURL error: ' . $error);
+    }
+    
+    if ($httpCode >= 400) {
+        $errorData = json_decode($response, true);
+        $errorMessage = $errorData['error']['message'] ?? 'HTTP error: ' . $httpCode;
+        throw new Exception($errorMessage);
+    }
+    
+    $decodedResponse = json_decode($response, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new Exception('Invalid JSON response');
+    }
+    
+    return $decodedResponse;
 }
 
 // メインの処理
@@ -270,46 +428,143 @@ try {
                 
                 
             case 'sheets_data':
-                // サンプルデータを返す
-                sendJsonResponse([
-                    'success' => true,
-                    'data' => [
-                        [
-                            'title' => '効果的なプレゼンテーション技法',
-                            'skill' => 'コミュニケーション',
-                            'description' => '聴衆を惹きつけるプレゼンテーション技法を学ぶ',
-                            'summary' => 'プレゼンテーションの基本構成と効果的な伝達方法',
-                            'transcript' => 'プレゼンテーションにおいて最も重要なのは...'
-                        ],
-                        [
-                            'title' => 'デジタルマーケティング基礎',
-                            'skill' => 'マーケティング',
-                            'description' => 'SEOとSNS活用による効果的なデジタルマーケティング戦略',
-                            'summary' => 'デジタル時代のマーケティング手法と実践方法',
-                            'transcript' => 'デジタルマーケティングの核心は顧客との接点を...'
+                $url = $data['url'] ?? '';
+                $columnMapping = $data['column_mapping'] ?? [];
+                
+                if (empty($url)) {
+                    sendJsonResponse(['success' => false, 'error' => 'URLが指定されていません'], 400);
+                }
+                
+                try {
+                    // スプレッドシートからCSVデータを取得
+                    $sheetData = fetchGoogleSheetsData($url);
+                    $headers = $sheetData['headers'];
+                    
+                    // CSV全体を再度取得して全データを処理
+                    $sheetId = $sheetData['sheet_id'];
+                    $csvUrl = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=csv&gid=0";
+                    
+                    $context = stream_context_create([
+                        'http' => [
+                            'method' => 'GET',
+                            'header' => [
+                                'User-Agent: TagGenerator/1.0',
+                                'Accept: text/csv,*/*'
+                            ],
+                            'timeout' => 30
                         ]
-                    ],
-                    'total_rows' => 400,
-                    'processed_rows' => 2
-                ]);
+                    ]);
+                    
+                    $csvData = @file_get_contents($csvUrl, false, $context);
+                    if ($csvData === false) {
+                        throw new Exception('スプレッドシートデータの取得に失敗しました。');
+                    }
+                    
+                    // 文字エンコーディングをUTF-8に統一
+                    $csvData = mb_convert_encoding($csvData, 'UTF-8', 'auto');
+                    
+                    // CSVを解析
+                    $csvResource = fopen('data://text/plain,' . urlencode($csvData), 'r');
+                    if (!$csvResource) {
+                        throw new Exception('CSVデータの解析に失敗しました。');
+                    }
+                    
+                    $allRows = [];
+                    $rowIndex = 0;
+                    while (($row = fgetcsv($csvResource)) !== false) {
+                        if ($rowIndex === 0) {
+                            // ヘッダー行はスキップ
+                            $rowIndex++;
+                            continue;
+                        }
+                        
+                        // 空行をスキップ
+                        if (empty(array_filter($row, function($cell) { return trim($cell) !== ''; }))) {
+                            continue;
+                        }
+                        
+                        // 列マッピングに基づいてデータを構造化
+                        $mappedData = [];
+                        
+                        if (isset($columnMapping['title']) && isset($row[$columnMapping['title']])) {
+                            $mappedData['title'] = trim($row[$columnMapping['title']]);
+                        }
+                        if (isset($columnMapping['skill']) && isset($row[$columnMapping['skill']])) {
+                            $mappedData['skill'] = trim($row[$columnMapping['skill']]);
+                        }
+                        if (isset($columnMapping['description']) && isset($row[$columnMapping['description']])) {
+                            $mappedData['description'] = trim($row[$columnMapping['description']]);
+                        }
+                        if (isset($columnMapping['summary']) && isset($row[$columnMapping['summary']])) {
+                            $mappedData['summary'] = trim($row[$columnMapping['summary']]);
+                        }
+                        if (isset($columnMapping['transcript']) && isset($row[$columnMapping['transcript']])) {
+                            $mappedData['transcript'] = trim($row[$columnMapping['transcript']]);
+                        }
+                        
+                        // 必須フィールドが存在する場合のみ追加
+                        if (!empty($mappedData['title']) && !empty($mappedData['skill'])) {
+                            $allRows[] = $mappedData;
+                        }
+                        
+                        $rowIndex++;
+                    }
+                    fclose($csvResource);
+                    
+                    sendJsonResponse([
+                        'success' => true,
+                        'data' => $allRows,
+                        'total_rows' => count($allRows),
+                        'processed_rows' => count($allRows)
+                    ]);
+                    
+                } catch (Exception $e) {
+                    sendJsonResponse(['success' => false, 'error' => $e->getMessage()]);
+                }
                 break;
                 
             case 'ai_process':
                 $videoData = $data['data'] ?? [];
                 $aiEngine = $data['ai_engine'] ?? 'openai';
+                $batchSize = intval($data['batch_size'] ?? 20);
+                $quality = $data['quality'] ?? 'balanced';
+                $useRealAI = $data['use_real_ai'] ?? false;
                 
                 $results = [];
                 $startTime = microtime(true);
+                $processedCount = 0;
                 
-                foreach ($videoData as $video) {
-                    $tags = callAIAPI($aiEngine, '', $video);
-                    $results[] = [
-                        'title' => $video['title'] ?? '',
-                        'generated_tags' => $tags,
-                        'confidence' => 0.85 + (count($tags) * 0.01),
-                        'processing_time' => microtime(true) - $startTime
-                    ];
+                // バッチ処理
+                $batches = array_chunk($videoData, $batchSize);
+                
+                foreach ($batches as $batchIndex => $batch) {
+                    foreach ($batch as $video) {
+                        // 品質設定に基づく処理時間の調整
+                        if ($quality === 'high' && $useRealAI) {
+                            usleep(100000); // 0.1秒の遅延（レート制限対策）
+                        }
+                        
+                        $tags = callAIAPI($aiEngine, '', $video);
+                        $results[] = [
+                            'title' => $video['title'] ?? '',
+                            'generated_tags' => $tags,
+                            'confidence' => 0.85 + (count($tags) * 0.01),
+                            'processing_time' => microtime(true) - $startTime
+                        ];
+                        
+                        $processedCount++;
+                        
+                        // メモリ使用量の監視
+                        if (memory_get_usage() > 256 * 1024 * 1024) { // 256MB
+                            error_log("Memory limit approaching, processed: $processedCount items");
+                            break 2;
+                        }
+                    }
                 }
+                
+                // AI モードの判定
+                $apiKey = getApiKey($aiEngine);
+                $aiMode = $apiKey ? 'real' : 'simulation';
                 
                 sendJsonResponse([
                     'success' => true,
@@ -317,7 +572,10 @@ try {
                     'total_tags_generated' => array_sum(array_map(function($r) { return count($r['generated_tags']); }, $results)),
                     'ai_engine' => $aiEngine,
                     'processing_time' => microtime(true) - $startTime,
-                    'ai_mode' => 'simulation'
+                    'ai_mode' => $aiMode,
+                    'processed_count' => $processedCount,
+                    'batch_size' => $batchSize,
+                    'quality' => $quality
                 ]);
                 break;
                 

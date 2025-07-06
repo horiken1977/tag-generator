@@ -625,30 +625,171 @@
             const batchSize = document.getElementById('batch-size').value;
             const quality = document.getElementById('quality').selectedOptions[0].text;
             
+            // 結果データを保存（ダウンロード用）
+            window.resultsData = {
+                sheetsData: sheetsData,
+                aiData: aiData,
+                optimizeData: optimizeData
+            };
+            
             document.getElementById('result-content').innerHTML = `
                 <div class="status success">
                     <h3>🎉 処理完了</h3>
                     <p>• 処理動画数: ${sheetsData.total_rows}件</p>
                     <p>• 生成タグ数: ${optimizeData.original_count}個 → ${optimizeData.optimized_count}個に最適化</p>
-                    <p>• 処理時間: ${aiData.processing_time}秒</p>
-                    <p>• 使用AI: ${aiEngine} (${aiData.ai_mode}モード)</p>
+                    <p>• 処理時間: ${aiData.processing_time.toFixed(2)}秒</p>
+                    <p>• 使用AI: ${aiEngine} (${aiData.ai_mode === 'real' ? '実API' : 'シミュレーション'}モード)</p>
                     <p>• バッチサイズ: ${batchSize}件</p>
                     <p>• 処理品質: ${quality}</p>
                     <p>• 削除されたタグ: ${optimizeData.original_count - optimizeData.optimized_count}個</p>
                 </div>
+                
                 <h4>📋 最適化されたタグ（上位20個）</h4>
                 <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
                     ${optimizeData.optimized_tags.slice(0, 20).join(', ')}
                 </div>
+                
                 <h4>📊 タグ出現頻度（上位10個）</h4>
                 <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
                     ${Object.entries(optimizeData.tag_frequencies).slice(0, 10).map(([tag, freq]) => 
                         `${tag}: ${freq}回`).join('<br>')}
                 </div>
-                <button class="btn">📥 結果をダウンロード</button>
-                <button class="btn btn-secondary">📊 新しいシートを作成</button>
-                <button class="btn btn-secondary">📈 詳細レポート表示</button>
+                
+                <h4>📈 動画別タグ生成結果（最初の5件）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${aiData.results.slice(0, 5).map((result, index) => `
+                        <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                            <strong>${index + 1}. ${result.title}</strong><br>
+                            <small>タグ: ${result.generated_tags.join(', ')}</small>
+                        </div>
+                    `).join('')}
+                    ${aiData.results.length > 5 ? `<p style="opacity: 0.7;">...他${aiData.results.length - 5}件</p>` : ''}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="downloadResults('csv')">📥 結果をCSVでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadResults('json')">📥 結果をJSONでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadTagsOnly()">📥 タグのみダウンロード</button>
+                    <button class="btn btn-secondary" onclick="showDetailedReport()">📈 詳細レポート表示</button>
+                </div>
             `;
+        }
+        
+        function downloadResults(format) {
+            if (!window.resultsData) {
+                alert('ダウンロードするデータがありません');
+                return;
+            }
+            
+            const { aiData, optimizeData } = window.resultsData;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            
+            if (format === 'csv') {
+                // CSV形式でダウンロード
+                let csv = 'タイトル,生成されたタグ,タグ数,信頼度\n';
+                aiData.results.forEach(result => {
+                    csv += `"${result.title}","${result.generated_tags.join(', ')}",${result.generated_tags.length},${result.confidence.toFixed(2)}\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `tag_results_${timestamp}.csv`;
+                link.click();
+                
+            } else if (format === 'json') {
+                // JSON形式でダウンロード
+                const jsonData = {
+                    metadata: {
+                        generated_at: new Date().toISOString(),
+                        total_videos: aiData.results.length,
+                        total_tags: optimizeData.optimized_count,
+                        ai_engine: aiData.ai_engine,
+                        ai_mode: aiData.ai_mode,
+                        processing_time: aiData.processing_time
+                    },
+                    results: aiData.results,
+                    optimized_tags: optimizeData.optimized_tags,
+                    tag_frequencies: optimizeData.tag_frequencies
+                };
+                
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `tag_results_${timestamp}.json`;
+                link.click();
+            }
+        }
+        
+        function downloadTagsOnly() {
+            if (!window.resultsData) {
+                alert('ダウンロードするデータがありません');
+                return;
+            }
+            
+            const { optimizeData } = window.resultsData;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            
+            // タグのみをテキストファイルでダウンロード
+            const tagsText = optimizeData.optimized_tags.join('\n');
+            const blob = new Blob([tagsText], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `optimized_tags_${timestamp}.txt`;
+            link.click();
+        }
+        
+        function showDetailedReport() {
+            if (!window.resultsData) {
+                alert('表示するデータがありません');
+                return;
+            }
+            
+            const { aiData, optimizeData } = window.resultsData;
+            
+            // 詳細レポートをポップアップで表示
+            const reportWindow = window.open('', 'DetailedReport', 'width=800,height=600');
+            reportWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Tag Generator - 詳細レポート</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                        h1 { color: #333; }
+                        .section { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Tag Generator 詳細レポート</h1>
+                    <div class="section">
+                        <h2>処理概要</h2>
+                        <p>生成日時: ${new Date().toLocaleString('ja-JP')}</p>
+                        <p>処理動画数: ${aiData.results.length}件</p>
+                        <p>生成タグ総数: ${optimizeData.original_count}個</p>
+                        <p>最適化後タグ数: ${optimizeData.optimized_count}個</p>
+                        <p>処理時間: ${aiData.processing_time.toFixed(2)}秒</p>
+                        <p>AIエンジン: ${aiData.ai_engine} (${aiData.ai_mode}モード)</p>
+                    </div>
+                    <div class="section">
+                        <h2>タグ頻度分析</h2>
+                        <table>
+                            <tr><th>タグ</th><th>出現回数</th><th>割合</th></tr>
+                            ${Object.entries(optimizeData.tag_frequencies).map(([tag, freq]) => `
+                                <tr>
+                                    <td>${tag}</td>
+                                    <td>${freq}</td>
+                                    <td>${(freq / aiData.results.length * 100).toFixed(1)}%</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
         }
         
         async function previewData() {
