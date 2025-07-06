@@ -155,6 +155,188 @@ function fetchGoogleSheetsData($url) {
     throw new Exception('有効なGoogle SheetsのURLではありません。');
 }
 
+// ステップ1: 軽量バッチ処理
+function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI) {
+    $results = [];
+    $batches = array_chunk($videoData, $batchSize);
+    
+    foreach ($batches as $batchIndex => $batch) {
+        foreach ($batch as $video) {
+            // 軽量データのみを使用（文字起こしを除外）
+            $lightweightVideo = [
+                'title' => $video['title'] ?? '',
+                'skill' => $video['skill'] ?? '',
+                'description' => $video['description'] ?? ''
+                // 文字起こしは意図的に除外
+            ];
+            
+            $tags = callAIAPI($aiEngine, '', $lightweightVideo);
+            $results[] = [
+                'title' => $video['title'] ?? '',
+                'generated_tags' => $tags,
+                'confidence' => 0.75 + (count($tags) * 0.01), // 軽量処理なので信頼度は少し低め
+                'processing_type' => 'lightweight'
+            ];
+            
+            // レート制限対策
+            if ($quality === 'high' && $useRealAI) {
+                usleep(50000); // 0.05秒の遅延
+            }
+        }
+    }
+    
+    return $results;
+}
+
+// ステップ2: 重要動画の個別処理
+function processDetailedIndividual($importantVideos, $aiEngine, $quality, $useRealAI) {
+    $results = [];
+    
+    foreach ($importantVideos as $video) {
+        // 文字起こしを含めた詳細処理
+        $detailedVideo = [
+            'title' => $video['title'] ?? '',
+            'skill' => $video['skill'] ?? '',
+            'description' => $video['description'] ?? '',
+            'summary' => $video['summary'] ?? '',
+            'transcript' => isset($video['transcript']) ? substr($video['transcript'], 0, 2000) : '' // 2000文字に制限
+        ];
+        
+        $tags = callAIAPI($aiEngine, '', $detailedVideo);
+        $results[] = [
+            'title' => $video['title'] ?? '',
+            'generated_tags' => $tags,
+            'confidence' => 0.90 + (count($tags) * 0.005), // 詳細処理なので信頼度は高め
+            'processing_type' => 'detailed'
+        ];
+        
+        // 個別処理なので長めの遅延
+        if ($useRealAI) {
+            usleep(200000); // 0.2秒の遅延
+        }
+    }
+    
+    return $results;
+}
+
+// ステップ3: タグ統合処理
+function unifyTags($lightweightTags, $detailedTags, $maxTags) {
+    $allTags = [];
+    $tagFrequency = [];
+    $tagSources = [];
+    
+    // 軽量処理のタグを収集
+    foreach ($lightweightTags as $result) {
+        foreach ($result['generated_tags'] as $tag) {
+            $normalizedTag = normalizeTag($tag);
+            $tagFrequency[$normalizedTag] = ($tagFrequency[$normalizedTag] ?? 0) + 1;
+            $tagSources[$normalizedTag]['lightweight'] = ($tagSources[$normalizedTag]['lightweight'] ?? 0) + 1;
+        }
+    }
+    
+    // 詳細処理のタグを収集（重み付けして追加）
+    foreach ($detailedTags as $result) {
+        foreach ($result['generated_tags'] as $tag) {
+            $normalizedTag = normalizeTag($tag);
+            $tagFrequency[$normalizedTag] = ($tagFrequency[$normalizedTag] ?? 0) + 2; // 詳細処理のタグは2倍の重み
+            $tagSources[$normalizedTag]['detailed'] = ($tagSources[$normalizedTag]['detailed'] ?? 0) + 1;
+        }
+    }
+    
+    // タグの類似度による統合
+    $unifiedTags = unifySimilarTags($tagFrequency);
+    
+    // 重要度順にソート
+    arsort($unifiedTags);
+    
+    // 上位タグを選択
+    $finalTags = array_slice($unifiedTags, 0, $maxTags, true);
+    
+    return [
+        [
+            'unified_tags' => array_keys($finalTags),
+            'tag_frequencies' => $finalTags,
+            'tag_sources' => $tagSources,
+            'processing_type' => 'unified',
+            'original_count' => count($tagFrequency),
+            'unified_count' => count($finalTags)
+        ]
+    ];
+}
+
+// タグ正規化関数
+function normalizeTag($tag) {
+    // 類似タグの統一
+    $synonyms = [
+        'マーケティング' => ['デジタルマーケティング', 'ネットマーケティング', 'Webマーケティング'],
+        'コミュニケーション' => ['コミュニケーション能力', '対人コミュニケーション'],
+        'プレゼンテーション' => ['プレゼン', 'プレゼンスキル', '発表'],
+        'リーダーシップ' => ['リーダー', 'リーダー力', 'リーダーシップスキル'],
+        'チームワーク' => ['チーム力', 'チームビルディング'],
+        'ビジネススキル' => ['ビジネス能力', 'ビジネス力']
+    ];
+    
+    $normalizedTag = trim($tag);
+    
+    // 同義語辞書でチェック
+    foreach ($synonyms as $master => $variations) {
+        if (in_array($normalizedTag, $variations)) {
+            return $master;
+        }
+    }
+    
+    return $normalizedTag;
+}
+
+// 類似タグの統合
+function unifySimilarTags($tagFrequency) {
+    $unified = [];
+    $processed = [];
+    
+    foreach ($tagFrequency as $tag => $freq) {
+        if (in_array($tag, $processed)) {
+            continue;
+        }
+        
+        $similarTags = findSimilarTags($tag, array_keys($tagFrequency));
+        $totalFreq = $freq;
+        $processed[] = $tag;
+        
+        foreach ($similarTags as $similarTag) {
+            if ($similarTag !== $tag && !in_array($similarTag, $processed)) {
+                $totalFreq += $tagFrequency[$similarTag];
+                $processed[] = $similarTag;
+            }
+        }
+        
+        $unified[$tag] = $totalFreq;
+    }
+    
+    return $unified;
+}
+
+// 類似タグの検出
+function findSimilarTags($baseTag, $allTags) {
+    $similar = [];
+    
+    foreach ($allTags as $tag) {
+        // レーベンシュタイン距離による類似度計算
+        $distance = levenshtein($baseTag, $tag);
+        $maxLength = max(mb_strlen($baseTag), mb_strlen($tag));
+        
+        if ($maxLength > 0) {
+            $similarity = 1 - ($distance / $maxLength);
+            
+            // 85%以上の類似度で統合対象とする
+            if ($similarity >= 0.85 && $similarity < 1.0) {
+                $similar[] = $tag;
+            }
+        }
+    }
+    
+    return $similar;
+}
+
 // AI API呼び出し
 function callAIAPI($provider, $prompt, $videoData) {
     $apiKey = getApiKey($provider);
@@ -526,6 +708,7 @@ try {
             case 'ai_process':
                 $videoData = $data['data'] ?? [];
                 $aiEngine = $data['ai_engine'] ?? 'openai';
+                $processingMode = $data['processing_mode'] ?? 'lightweight'; // lightweight, detailed, unified
                 $batchSize = intval($data['batch_size'] ?? 20);
                 $quality = $data['quality'] ?? 'balanced';
                 $useRealAI = $data['use_real_ai'] ?? false;
@@ -534,32 +717,30 @@ try {
                 $startTime = microtime(true);
                 $processedCount = 0;
                 
-                // バッチ処理
-                $batches = array_chunk($videoData, $batchSize);
-                
-                foreach ($batches as $batchIndex => $batch) {
-                    foreach ($batch as $video) {
-                        // 品質設定に基づく処理時間の調整
-                        if ($quality === 'high' && $useRealAI) {
-                            usleep(100000); // 0.1秒の遅延（レート制限対策）
-                        }
+                switch ($processingMode) {
+                    case 'lightweight':
+                        // ステップ1: 軽量バッチ処理（タイトル + スキル + 説明文のみ）
+                        $results = processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI);
+                        $processedCount = count($results);
+                        break;
                         
-                        $tags = callAIAPI($aiEngine, '', $video);
-                        $results[] = [
-                            'title' => $video['title'] ?? '',
-                            'generated_tags' => $tags,
-                            'confidence' => 0.85 + (count($tags) * 0.01),
-                            'processing_time' => microtime(true) - $startTime
-                        ];
+                    case 'detailed':
+                        // ステップ2: 重要動画の個別処理（文字起こし含む）
+                        $importantVideos = $data['important_videos'] ?? [];
+                        $results = processDetailedIndividual($importantVideos, $aiEngine, $quality, $useRealAI);
+                        $processedCount = count($results);
+                        break;
                         
-                        $processedCount++;
+                    case 'unified':
+                        // ステップ3: タグ統合処理
+                        $lightweightTags = $data['lightweight_tags'] ?? [];
+                        $detailedTags = $data['detailed_tags'] ?? [];
+                        $results = unifyTags($lightweightTags, $detailedTags, $data['max_tags'] ?? 200);
+                        $processedCount = count($results);
+                        break;
                         
-                        // メモリ使用量の監視
-                        if (memory_get_usage() > 256 * 1024 * 1024) { // 256MB
-                            error_log("Memory limit approaching, processed: $processedCount items");
-                            break 2;
-                        }
-                    }
+                    default:
+                        throw new Exception('Unknown processing mode: ' . $processingMode);
                 }
                 
                 // AI モードの判定
@@ -569,11 +750,14 @@ try {
                 sendJsonResponse([
                     'success' => true,
                     'results' => $results,
-                    'total_tags_generated' => array_sum(array_map(function($r) { return count($r['generated_tags']); }, $results)),
+                    'total_tags_generated' => array_sum(array_map(function($r) { 
+                        return is_array($r['generated_tags'] ?? []) ? count($r['generated_tags']) : 0; 
+                    }, $results)),
                     'ai_engine' => $aiEngine,
                     'processing_time' => microtime(true) - $startTime,
                     'ai_mode' => $aiMode,
                     'processed_count' => $processedCount,
+                    'processing_mode' => $processingMode,
                     'batch_size' => $batchSize,
                     'quality' => $quality
                 ]);
