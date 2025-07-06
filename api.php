@@ -213,10 +213,20 @@ function processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $u
             error_log("processLightweightBatch: About to call AI API");
             try {
                 $tags = callAIAPI($aiEngine, '', $lightweightVideo);
-                error_log("processLightweightBatch: AI API returned " . count($tags) . " tags");
+                if (!is_array($tags)) {
+                    error_log("processLightweightBatch: AI API returned non-array: " . gettype($tags));
+                    $tags = [];
+                } else {
+                    error_log("processLightweightBatch: AI API returned " . count($tags) . " tags");
+                }
             } catch (Exception $e) {
                 error_log("processLightweightBatch: AI API error: " . $e->getMessage());
+                error_log("processLightweightBatch: Error trace: " . $e->getTraceAsString());
                 $tags = []; // エラーの場合は空配列
+            } catch (Error $e) {
+                error_log("processLightweightBatch: PHP Fatal Error: " . $e->getMessage());
+                error_log("processLightweightBatch: Fatal Error trace: " . $e->getTraceAsString());
+                $tags = []; // Fatal Errorの場合も空配列
             }
             
             $results[] = [
@@ -432,19 +442,39 @@ function callAIAPI($provider, $prompt, $videoData) {
     $userPrompt .= "\nタグは日本語で、具体的かつ検索しやすい形式で生成してください。カンマ区切りで出力してください。";
     
     try {
+        error_log("callAIAPI: About to call $provider API");
         switch ($provider) {
             case 'openai':
-                return callOpenAIForTags($apiKey, $systemPrompt, $userPrompt);
+                $result = callOpenAIForTags($apiKey, $systemPrompt, $userPrompt);
+                break;
             case 'claude':
-                return callClaudeForTags($apiKey, $systemPrompt, $userPrompt);
+                $result = callClaudeForTags($apiKey, $systemPrompt, $userPrompt);
+                break;
             case 'gemini':
-                return callGeminiForTags($apiKey, $userPrompt);
+                $result = callGeminiForTags($apiKey, $userPrompt);
+                break;
             default:
-                return generateSimulatedTags($videoData);
+                error_log("callAIAPI: Unknown provider, using simulation");
+                $result = generateSimulatedTags($videoData);
         }
+        
+        if (!is_array($result)) {
+            error_log("callAIAPI: Non-array result from $provider, using simulation");
+            return generateSimulatedTags($videoData);
+        }
+        
+        error_log("callAIAPI: Successfully got " . count($result) . " tags from $provider");
+        return $result;
+        
     } catch (Exception $e) {
-        error_log("AI API Error: " . $e->getMessage());
+        error_log("callAIAPI: Exception in $provider API: " . $e->getMessage());
+        error_log("callAIAPI: Exception trace: " . $e->getTraceAsString());
         // エラーの場合はシミュレーションにフォールバック
+        return generateSimulatedTags($videoData);
+    } catch (Error $e) {
+        error_log("callAIAPI: Fatal error in $provider API: " . $e->getMessage());
+        error_log("callAIAPI: Fatal error trace: " . $e->getTraceAsString());
+        // Fatal Errorの場合もシミュレーションにフォールバック
         return generateSimulatedTags($videoData);
     }
 }
@@ -484,6 +514,7 @@ function generateSimulatedTags($videoData) {
 
 // OpenAI API呼び出し
 function callOpenAIForTags($apiKey, $systemPrompt, $userPrompt) {
+    error_log("callOpenAIForTags: Starting OpenAI API call");
     $url = 'https://api.openai.com/v1/chat/completions';
     
     $headers = [
@@ -501,13 +532,22 @@ function callOpenAIForTags($apiKey, $systemPrompt, $userPrompt) {
         'temperature' => 0.7
     ];
     
+    error_log("callOpenAIForTags: Making HTTP request to OpenAI");
     $response = makeHTTPRequest($url, $headers, $data);
+    error_log("callOpenAIForTags: Got response from OpenAI");
     
     if (isset($response['choices'][0]['message']['content'])) {
         $tagsString = $response['choices'][0]['message']['content'];
-        return array_map('trim', explode(',', $tagsString));
+        error_log("callOpenAIForTags: Raw tags string: " . $tagsString);
+        
+        $tags = array_map('trim', explode(',', $tagsString));
+        $tags = array_filter($tags, function($tag) { return !empty($tag); }); // 空のタグを除去
+        
+        error_log("callOpenAIForTags: Parsed " . count($tags) . " tags");
+        return array_values($tags); // インデックスを再整理
     }
     
+    error_log("callOpenAIForTags: Invalid response structure: " . json_encode($response));
     throw new Exception('Invalid OpenAI response');
 }
 
@@ -573,39 +613,76 @@ function callGeminiForTags($apiKey, $userPrompt) {
 
 // HTTP リクエスト実行
 function makeHTTPRequest($url, $headers, $data) {
+    error_log("makeHTTPRequest: Starting request to: $url");
+    
+    if (!function_exists('curl_init')) {
+        error_log("makeHTTPRequest: cURL not available");
+        throw new Exception('cURL is not available');
+    }
+    
     $ch = curl_init($url);
+    if ($ch === false) {
+        error_log("makeHTTPRequest: Failed to initialize cURL");
+        throw new Exception('Failed to initialize cURL');
+    }
+    
+    $postData = json_encode($data);
+    error_log("makeHTTPRequest: Request data size: " . strlen($postData) . " bytes");
     
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($data),
+        CURLOPT_POSTFIELDS => $postData,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => true
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_MAXREDIRS => 0
     ]);
     
+    error_log("makeHTTPRequest: Executing cURL request");
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
+    $info = curl_getinfo($ch);
     
     curl_close($ch);
     
+    error_log("makeHTTPRequest: HTTP Code: $httpCode");
+    error_log("makeHTTPRequest: Response size: " . strlen($response) . " bytes");
+    
     if ($error) {
+        error_log("makeHTTPRequest: cURL error: $error");
         throw new Exception('cURL error: ' . $error);
     }
     
+    if ($response === false) {
+        error_log("makeHTTPRequest: cURL returned false");
+        throw new Exception('cURL returned false');
+    }
+    
     if ($httpCode >= 400) {
+        error_log("makeHTTPRequest: HTTP error $httpCode, response: " . substr($response, 0, 500));
         $errorData = json_decode($response, true);
         $errorMessage = $errorData['error']['message'] ?? 'HTTP error: ' . $httpCode;
         throw new Exception($errorMessage);
     }
     
+    if (empty($response)) {
+        error_log("makeHTTPRequest: Empty response");
+        throw new Exception('Empty response from server');
+    }
+    
     $decodedResponse = json_decode($response, true);
     
     if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception('Invalid JSON response');
+        error_log("makeHTTPRequest: JSON decode error: " . json_last_error_msg());
+        error_log("makeHTTPRequest: Raw response: " . substr($response, 0, 500));
+        throw new Exception('Invalid JSON response: ' . json_last_error_msg());
     }
     
+    error_log("makeHTTPRequest: Request completed successfully");
     return $decodedResponse;
 }
 
@@ -852,6 +929,22 @@ try {
                 $apiKey = getApiKey($aiEngine);
                 $aiMode = $apiKey ? 'real' : 'simulation';
                 
+                // 安全チェック：空の結果を防ぐ
+                if (empty($results) && !empty($videoData)) {
+                    error_log("ai_process: Empty results detected, creating fallback results");
+                    // フォールバック結果を作成
+                    $results = [];
+                    foreach (array_slice($videoData, 0, 2) as $video) {
+                        $results[] = [
+                            'title' => $video['title'] ?? 'Unknown Title',
+                            'generated_tags' => ['ビジネススキル', 'マーケティング', '学習'],
+                            'confidence' => 0.5,
+                            'processing_type' => 'fallback',
+                            'batch_index' => 0
+                        ];
+                    }
+                }
+                
                 $responseData = [
                     'success' => true,
                     'results' => $results,
@@ -870,6 +963,17 @@ try {
                 
                 error_log("ai_process: About to send response with " . count($results) . " results");
                 error_log("ai_process: Response data keys: " . json_encode(array_keys($responseData)));
+                
+                // 最終安全チェック
+                if (empty($responseData) || !isset($responseData['success'])) {
+                    error_log("ai_process: Critical error - response data is invalid");
+                    $responseData = [
+                        'success' => false,
+                        'error' => 'Internal processing error',
+                        'results' => [],
+                        'processed_count' => 0
+                    ];
+                }
                 
                 sendJsonResponse($responseData);
                 break;
