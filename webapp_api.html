@@ -168,6 +168,10 @@
                 <span id="test-loading" class="loading hidden"></span>
                 接続テスト
             </button>
+            <button class="btn btn-secondary" onclick="runDiagnostics()" id="diagnostic-btn" style="margin-left: 10px;">
+                <span id="diagnostic-loading" class="loading hidden"></span>
+                診断テスト
+            </button>
             
             <div id="connection-status"></div>
             
@@ -338,6 +342,71 @@
                 console.log('Attempted URL:', API_BASE_URL + '?action=status');
                 
                 return false;
+            }
+        }
+        
+        // 診断テスト
+        async function runDiagnostics() {
+            const diagnosticBtn = document.getElementById('diagnostic-btn');
+            const diagnosticLoading = document.getElementById('diagnostic-loading');
+            const statusDiv = document.getElementById('connection-status');
+            
+            console.log('Starting diagnostics...');
+            
+            // UI更新
+            diagnosticBtn.disabled = true;
+            diagnosticLoading.classList.remove('hidden');
+            statusDiv.innerHTML = '<div class="status info">🔍 システム診断中...</div>';
+            
+            try {
+                console.log('Calling debug_test endpoint...');
+                const result = await callAPI('debug_test', {
+                    method: 'POST',
+                    body: JSON.stringify({})
+                });
+                
+                console.log('Diagnostic result:', result);
+                
+                // 結果を表示
+                statusDiv.innerHTML = `
+                    <div class="status ${result.completed ? 'success' : 'warning'}">
+                        <h4>🔍 システム診断結果</h4>
+                        <div style="text-align: left; margin: 15px 0;">
+                            <strong>基本設定:</strong><br>
+                            • メモリ制限: ${result.memory_limit || 'N/A'}<br>
+                            • 実行時間制限: ${result.max_execution_time || 'N/A'}秒<br>
+                            • 現在のメモリ使用量: ${result.current_memory || 'N/A'}<br>
+                            • cURL利用可能: ${result.curl_available ? '✅' : '❌'}<br>
+                            • .envファイル存在: ${result.env_file_exists ? '✅' : '❌'}<br>
+                            <br>
+                            <strong>環境変数:</strong><br>
+                            • 読み込み済み変数数: ${result.env_vars_count || 0}個<br>
+                            • APIキー利用可能: ${result.api_key_available ? '✅' : '❌'}<br>
+                            <br>
+                            <strong>処理テスト:</strong><br>
+                            • シミュレーションタグ: ${result.simulation_tags ? result.simulation_tags.length + '個生成' : '❌ 失敗'}<br>
+                            • 最終メモリ使用量: ${result.final_memory || 'N/A'}<br>
+                            • 処理ステップ: ${result.step || '不明'}<br>
+                            • 診断完了: ${result.completed ? '✅' : '❌'}
+                        </div>
+                        ${result.env_error ? `<div style="color: #ff6b6b;">環境エラー: ${result.env_error}</div>` : ''}
+                        ${result.api_key_error ? `<div style="color: #ff6b6b;">APIキーエラー: ${result.api_key_error}</div>` : ''}
+                        ${result.simulation_error ? `<div style="color: #ff6b6b;">シミュレーションエラー: ${result.simulation_error}</div>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Diagnostic failed:', error);
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ 診断テスト失敗<br>
+                        エラー: ${error.message}<br>
+                        <small>詳細はコンソールログを確認してください</small>
+                    </div>
+                `;
+            } finally {
+                diagnosticBtn.disabled = false;
+                diagnosticLoading.classList.add('hidden');
             }
         }
         

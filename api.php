@@ -860,91 +860,137 @@ try {
                 }
                 break;
                 
+            case 'debug_test':
+                // 診断用エンドポイント
+                error_log("DEBUG: debug_test endpoint called");
+                
+                $testResult = [
+                    'step' => 'start',
+                    'memory_limit' => ini_get('memory_limit'),
+                    'max_execution_time' => ini_get('max_execution_time'),
+                    'current_memory' => memory_get_usage() / 1024 / 1024 . ' MB',
+                    'curl_available' => function_exists('curl_init'),
+                    'env_file_exists' => file_exists(__DIR__ . '/.env'),
+                ];
+                
+                error_log("DEBUG: Basic checks completed");
+                
+                // 環境変数テスト
+                try {
+                    $envVars = loadEnv();
+                    $testResult['env_vars_count'] = count($envVars);
+                    $testResult['step'] = 'env_loaded';
+                    error_log("DEBUG: Environment loaded");
+                } catch (Exception $e) {
+                    $testResult['env_error'] = $e->getMessage();
+                    error_log("DEBUG: Environment load failed: " . $e->getMessage());
+                }
+                
+                // APIキーテスト
+                try {
+                    $apiKey = getApiKey('openai');
+                    $testResult['api_key_available'] = !empty($apiKey);
+                    $testResult['step'] = 'api_key_checked';
+                    error_log("DEBUG: API key checked");
+                } catch (Exception $e) {
+                    $testResult['api_key_error'] = $e->getMessage();
+                    error_log("DEBUG: API key check failed: " . $e->getMessage());
+                }
+                
+                // シミュレーションタグ生成テスト
+                try {
+                    $testVideo = ['title' => 'テスト', 'skill' => 'テストスキル'];
+                    $tags = generateSimulatedTags($testVideo);
+                    $testResult['simulation_tags'] = $tags;
+                    $testResult['step'] = 'simulation_completed';
+                    error_log("DEBUG: Simulation test completed");
+                } catch (Exception $e) {
+                    $testResult['simulation_error'] = $e->getMessage();
+                    error_log("DEBUG: Simulation test failed: " . $e->getMessage());
+                }
+                
+                $testResult['final_memory'] = memory_get_usage() / 1024 / 1024 . ' MB';
+                $testResult['completed'] = true;
+                
+                error_log("DEBUG: Sending test result: " . json_encode($testResult));
+                sendJsonResponse($testResult);
+                break;
+                
             case 'ai_process':
-                // リクエストサイズの事前チェック
+                error_log("=== AI_PROCESS START ===");
+                
+                // 基本情報のログ
                 $requestSize = strlen(json_encode($data));
                 error_log("AI Process request size: " . $requestSize . " bytes");
-                error_log("AI Process data keys: " . json_encode(array_keys($data)));
-                error_log("AI Process data structure: " . json_encode($data, JSON_UNESCAPED_UNICODE));
+                error_log("Memory at start: " . (memory_get_usage() / 1024 / 1024) . " MB");
                 
-                if ($requestSize > 16 * 1024) { // 16KB制限（極めて保守的）
-                    error_log("Request too large: " . $requestSize . " bytes, max allowed: 16KB");
-                    sendJsonResponse(['success' => false, 'error' => 'リクエストサイズが制限を超えています。より小さなデータで再試行してください。'], 413);
+                // リクエストサイズチェック
+                if ($requestSize > 16 * 1024) {
+                    error_log("Request too large, rejecting");
+                    sendJsonResponse(['success' => false, 'error' => 'リクエストサイズが制限を超えています。'], 413);
                     break;
                 }
                 
                 $videoData = $data['data'] ?? [];
                 $aiEngine = $data['ai_engine'] ?? 'openai';
                 $processingMode = $data['processing_mode'] ?? 'lightweight';
-                $batchSize = intval($data['batch_size'] ?? 2); // デフォルトバッチサイズを2に縮小
-                $quality = $data['quality'] ?? 'balanced';
-                $useRealAI = $data['use_real_ai'] ?? false;
+                error_log("AI Process parameters: engine=$aiEngine, mode=$processingMode, data_count=" . count($videoData));
                 
+                // 超簡単なテスト処理
                 $results = [];
                 $startTime = microtime(true);
-                $processedCount = 0;
                 
-                // タイムアウト設定
-                set_time_limit(300); // 5分のタイムアウト
+                error_log("=== TESTING SIMPLE PROCESSING ===");
                 
-                switch ($processingMode) {
-                    case 'lightweight':
-                        // ステップ1: 軽量バッチ処理（タイトル + スキル + 説明文のみ）
-                        error_log("Starting lightweight processing for " . count($videoData) . " items");
-                        if (count($videoData) > 10) {
-                            // 大量データの場合は最初の10件のみ処理
-                            $videoData = array_slice($videoData, 0, 10);
-                            error_log("Large dataset detected, processing first 10 items only");
-                        }
-                        error_log("About to call processLightweightBatch");
-                        $results = processLightweightBatch($videoData, $aiEngine, $batchSize, $quality, $useRealAI);
-                        error_log("processLightweightBatch completed, got " . count($results) . " results");
-                        $processedCount = count($results);
-                        break;
+                // データがある場合のみ処理
+                if (!empty($videoData)) {
+                    error_log("Processing " . count($videoData) . " items");
+                    
+                    // 最初の1件だけを安全に処理
+                    $firstItem = $videoData[0];
+                    error_log("First item title: " . ($firstItem['title'] ?? 'no title'));
+                    
+                    try {
+                        error_log("=== TESTING SIMULATION TAGS ===");
+                        $testTags = generateSimulatedTags([
+                            'title' => substr($firstItem['title'] ?? '', 0, 20),
+                            'skill' => substr($firstItem['skill'] ?? '', 0, 15)
+                        ]);
+                        error_log("Simulation tags generated: " . count($testTags));
                         
-                    case 'detailed':
-                        // ステップ2: 重要動画の個別処理（文字起こし含む）
-                        $importantVideos = $data['important_videos'] ?? [];
-                        if (count($importantVideos) > 20) {
-                            // 詳細処理は最大20件に制限
-                            $importantVideos = array_slice($importantVideos, 0, 20);
-                        }
-                        $results = processDetailedIndividual($importantVideos, $aiEngine, $quality, $useRealAI);
-                        $processedCount = count($results);
-                        break;
-                        
-                    case 'unified':
-                        // ステップ3: タグ統合処理
-                        $lightweightTags = $data['lightweight_tags'] ?? [];
-                        $detailedTags = $data['detailed_tags'] ?? [];
-                        $results = unifyTags($lightweightTags, $detailedTags, $data['max_tags'] ?? 200);
-                        $processedCount = count($results);
-                        break;
-                        
-                    default:
-                        throw new Exception('Unknown processing mode: ' . $processingMode);
-                }
-                
-                // AI モードの判定
-                $apiKey = getApiKey($aiEngine);
-                $aiMode = $apiKey ? 'real' : 'simulation';
-                
-                // 安全チェック：空の結果を防ぐ
-                if (empty($results) && !empty($videoData)) {
-                    error_log("ai_process: Empty results detected, creating fallback results");
-                    // フォールバック結果を作成
-                    $results = [];
-                    foreach (array_slice($videoData, 0, 2) as $video) {
                         $results[] = [
-                            'title' => $video['title'] ?? 'Unknown Title',
-                            'generated_tags' => ['ビジネススキル', 'マーケティング', '学習'],
-                            'confidence' => 0.5,
-                            'processing_type' => 'fallback',
-                            'batch_index' => 0
+                            'title' => $firstItem['title'] ?? 'Unknown',
+                            'generated_tags' => $testTags,
+                            'confidence' => 0.8,
+                            'processing_type' => 'simple_test'
+                        ];
+                        
+                        error_log("Result created successfully");
+                        
+                    } catch (Exception $e) {
+                        error_log("Exception in simple processing: " . $e->getMessage());
+                        $results[] = [
+                            'title' => 'Error occurred',
+                            'generated_tags' => ['エラー'],
+                            'confidence' => 0.1,
+                            'processing_type' => 'error'
                         ];
                     }
+                } else {
+                    error_log("No data to process");
+                    $results[] = [
+                        'title' => 'No data',
+                        'generated_tags' => ['データなし'],
+                        'confidence' => 0.0,
+                        'processing_type' => 'no_data'
+                    ];
                 }
                 
+                $processedCount = count($results);
+                error_log("=== PREPARING RESPONSE ===");
+                error_log("Results count: " . $processedCount);
+                
+                // レスポンス準備
                 $responseData = [
                     'success' => true,
                     'results' => $results,
@@ -953,27 +999,15 @@ try {
                     }, $results)),
                     'ai_engine' => $aiEngine,
                     'processing_time' => microtime(true) - $startTime,
-                    'ai_mode' => $aiMode,
+                    'ai_mode' => 'simulation',
                     'processed_count' => $processedCount,
                     'processing_mode' => $processingMode,
-                    'batch_size' => $batchSize,
-                    'quality' => $quality,
-                    'request_size' => $requestSize
+                    'batch_size' => 1,
+                    'quality' => 'test'
                 ];
                 
-                error_log("ai_process: About to send response with " . count($results) . " results");
-                error_log("ai_process: Response data keys: " . json_encode(array_keys($responseData)));
-                
-                // 最終安全チェック
-                if (empty($responseData) || !isset($responseData['success'])) {
-                    error_log("ai_process: Critical error - response data is invalid");
-                    $responseData = [
-                        'success' => false,
-                        'error' => 'Internal processing error',
-                        'results' => [],
-                        'processed_count' => 0
-                    ];
-                }
+                error_log("=== SENDING RESPONSE ===");
+                error_log("Response prepared, about to send");
                 
                 sendJsonResponse($responseData);
                 break;
