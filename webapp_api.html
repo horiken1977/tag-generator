@@ -696,25 +696,25 @@
                 statusText.innerHTML = `
                     <div class="status info">
                         🚀 ステップ2/5: マイクロバッチ処理中...<br>
-                        <small>データを小分けして安全に処理中（最大2件ずつ）</small>
+                        <small>データを小分けして安全に処理中（最大5件ずつ）</small>
                     </div>
                 `;
                 progressBar.style.width = '30%';
                 
-                // 非常に小さなバッチで分割処理
-                const microBatchSize = 2;
-                const maxTotalItems = Math.min(sheetsData.data.length, 10); // 最大10件に制限
+                // 非常に小さなバッチで分割処理 - 修正版
+                const microBatchSize = 5; // 成功実績のあるサイズ
+                const maxTotalItems = Math.min(sheetsData.data.length, 15); // 最大15件に制限
                 const allLightweightResults = [];
                 let totalProcessingTime = 0;
                 
                 for (let i = 0; i < maxTotalItems; i += microBatchSize) {
                     const microBatch = sheetsData.data.slice(i, Math.min(i + microBatchSize, maxTotalItems));
                     
-                    // データサイズを最小化
+                    // データサイズを最小化（成功実績に基づく）
                     const optimizedBatch = microBatch.map(item => ({
-                        title: (item.title || '').substring(0, 20),      // 20文字に制限
-                        skill: (item.skill || '').substring(0, 15),      // 15文字に制限
-                        description: (item.description || '').substring(0, 30) // 30文字に制限
+                        title: (item.title || '').substring(0, 30),      // 30文字に制限
+                        skill: (item.skill || '').substring(0, 20),      // 20文字に制限
+                        description: (item.description || '').substring(0, 50) // 50文字に制限
                     }));
                     
                     const requestData = {
@@ -729,8 +729,8 @@
                     const requestSize = JSON.stringify(requestData).length;
                     console.log(`Micro-batch ${Math.floor(i/microBatchSize) + 1} size:`, requestSize, 'bytes');
                     
-                    // 10KB制限で極めて保守的に
-                    if (requestSize > 10 * 1024) {
+                    // 成功実績に基づいたサイズ制限
+                    if (requestSize > 8 * 1024) { // 8KB制限
                         console.warn('Micro-batch still too large, skipping...');
                         continue;
                     }
@@ -753,8 +753,8 @@
                             totalProcessingTime += microResponse.processing_time || 0;
                         }
                         
-                        // バッチ間の休憩
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        // バッチ間の休憩（成功実績に基づく）
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
                     } catch (batchError) {
                         console.warn(`Micro-batch ${Math.floor(i/microBatchSize) + 1} failed:`, batchError.message);
