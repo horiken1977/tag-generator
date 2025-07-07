@@ -1,142 +1,106 @@
-# 開発プロジェクト管理システム
+# Video Tag Generator
 
-開発ドキュメントの自動生成・管理・可視化ツール
+マーケティング教育動画のタグ生成アプリケーション
 
-## 🌐 GitHub Pages
+## 概要
 
-このプロジェクトのドキュメントはGitHub Pagesで公開されています：
+Googleスプレッドシートからマーケティング教育動画のデータを読み込み、AI（OpenAI/Claude/Gemini）を使用して検索性の高いタグを自動生成するアプリケーションです。
 
-**🏠 メインページ（ダッシュボード）**: [https://horiken1977.github.io/tags/](https://horiken1977.github.io/tags/)
+## 機能
 
-### 📄 ドキュメント一覧
+- **Google Sheets連携**: スプレッドシートURL入力による自動データ読み込み
+- **マルチAI対応**: OpenAI GPT / Claude / Gemini から選択可能
+- **バッチ処理**: メモリ効率的な分割処理（400動画対応）
+- **タグ最適化**: 重複排除・重要度スコアリング
+- **結果出力**: 元ファイルのコピーを作成してタグを追加
 
-- **開発ダッシュボード**: [https://horiken1977.github.io/tags/](https://horiken1977.github.io/tags/)
-- **機能設計書**: [https://horiken1977.github.io/tags/feature_design.html](https://horiken1977.github.io/tags/feature_design.html)
-- **環境設計書**: [https://horiken1977.github.io/tags/environment_design.html](https://horiken1977.github.io/tags/environment_design.html)
-- **テスト仕様書**: [https://horiken1977.github.io/tags/test_specification.html](https://horiken1977.github.io/tags/test_specification.html)
+## さくらインターネット環境での設定
 
-## ✨ 主要機能
+### 1. ファイルアップロード
 
-- **自動ドキュメント生成** - Claude Codeとのチャット内容から自動的にドキュメントを生成・更新
-- **進捗可視化** - プロジェクトの進捗をグラフィカルにダッシュボード表示
-- **チャット自動保存** - 2時間ごとにチャット履歴を自動バックアップ
-- **テスト管理** - テストケースの管理と実行結果の記録
-
-## 🚀 セットアップ方法
-
-### 前提条件
-
-- Python 3.8以上
-- Git（リポジトリ管理を行う場合）
-
-### インストール
-
-1. リポジトリをクローン
 ```bash
-git clone https://github.com/horiken1977/tags.git
-cd tags
+# アプリケーションファイルをさくらインターネットサーバーにアップロード
+scp -r tag_generator/ user@your_domain.sakura.ne.jp:~/www/
 ```
 
-2. 必要なPythonパッケージをインストール
+### 2. 環境設定
+
 ```bash
-pip install schedule
+# .envファイルを作成してAPIキーを設定
+cp .env.template .env
+# .envファイルを編集してAPIキーを入力
 ```
 
-3. スクリプトの実行権限を付与（Unix系OSの場合）
+### 3. 依存関係インストール
+
 ```bash
-chmod +x docs/auto_updater.py
-chmod +x scripts/chat_backup.py
+pip3 install -r requirements.txt
 ```
 
-## 📝 使用方法
+### 4. アプリケーション起動
 
-### ドキュメント自動更新
-
-チャット内容を監視してドキュメントを自動更新：
 ```bash
-# 監視モードで実行（推奨）
-python docs/auto_updater.py
-
-# 1回だけ実行
-python docs/auto_updater.py --once
+# Streamlitアプリケーションを起動
+streamlit run ui/streamlit_app.py --server.port 8501
 ```
 
-### チャット自動保存
+## API キー設定
 
-定期的にチャット履歴をバックアップ：
-```bash
-# デフォルト設定（2時間ごと）で実行
-python scripts/chat_backup.py
+`.env` ファイルに以下の設定を行ってください：
 
-# カスタム間隔で実行
-python scripts/chat_backup.py --interval 3h
+```env
+# AI Service API Keys
+OPENAI_API_KEY=your_actual_openai_api_key
+CLAUDE_API_KEY=your_actual_claude_api_key
+GEMINI_API_KEY=your_actual_gemini_api_key
 
-# バックアップ一覧を表示
-python scripts/chat_backup.py --list
-
-# バックアップから復元
-python scripts/chat_backup.py --restore CLAUDE_backup_20240105_120000.md
+# Google Service Account
+GOOGLE_PROJECT_ID=your_project_id
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_ACTUAL_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
+GOOGLE_CLIENT_EMAIL=your_service_account@your_project.iam.gserviceaccount.com
 ```
 
-## 📂 ディレクトリ構造
+## 使用方法
+
+1. **スプレッドシート設定**
+   - GoogleスプレッドシートのURLを入力
+   - 対象シートを選択
+   - データ列をマッピング（タイトル、スキル名、説明文、要約、文字起こし）
+
+2. **AI選択**
+   - OpenAI、Claude、Gemini から処理エンジンを選択
+
+3. **処理実行**
+   - バッチサイズを設定（推奨：10-20件）
+   - タグ生成処理を開始
+
+4. **結果確認**
+   - 生成されたタグを確認
+   - 新しいスプレッドシートのリンクを取得
+
+## ディレクトリ構造
 
 ```
-/
-├── docs/                    # ドキュメント関連
-│   ├── dashboard.html       # 開発ダッシュボード
-│   ├── feature_design.html  # 機能設計書
-│   ├── environment_design.html  # 環境設計書
-│   ├── test_specification.html  # テスト仕様書
-│   ├── progress_data.json   # 進捗データ
-│   └── auto_updater.py      # 自動更新スクリプト
-│
-├── test/                    # テスト関連
-│   ├── scripts/            # テストスクリプト
-│   └── data/               # テストデータ
-│
-├── scripts/                 # ユーティリティスクリプト
-│   └── chat_backup.py       # チャットバックアップ
-│
-├── backups/                 # バックアップディレクトリ（自動生成）
-├── index.html              # GitHub Pages メインページ
-├── _config.yml             # Jekyll設定
-├── CLAUDE.md               # Claude Code設定ファイル
-└── README.md               # 本ファイル
+tag_generator/
+├── src/                     # ソースコード
+│   ├── sheets_client.py     # Google Sheets API
+│   ├── ai_processors/       # AI処理モジュール
+│   ├── batch_processor.py   # バッチ処理
+│   └── tag_optimizer.py     # タグ最適化
+├── ui/                      # ユーザーインターフェース
+│   └── streamlit_app.py     # メインUI
+├── config/                  # 設定ファイル
+├── .env                     # 環境変数（要作成）
+└── requirements.txt         # 依存関係
 ```
 
-## 🔧 GitHub Pages設定
+## 注意事項
 
-### 自動デプロイ設定
+- APIキーは `.env` ファイルに安全に保存してください
+- Google Service Accountの権限設定を確認してください
+- さくらインターネットのPython環境を事前に確認してください
+- 処理中はブラウザを閉じないでください
 
-1. GitHubリポジトリの設定ページで「Pages」セクションに移動
-2. Sourceを「Deploy from a branch」に設定
-3. Branchを「main」または「master」に設定
-4. Folderを「/ (root)」に設定
-5. 「Save」をクリック
+## サポート
 
-### カスタムドメイン（オプション）
-
-独自ドメインを使用する場合：
-1. リポジトリのルートに `CNAME` ファイルを作成
-2. ファイルにドメイン名を記述（例：`docs.yoursite.com`）
-3. DNSでCNAMEレコードを設定
-
-## 🤝 貢献方法
-
-1. このリポジトリをフォーク
-2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
-
-## 📄 ライセンス
-
-このプロジェクトはMITライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
-
-## 🆘 サポート
-
-問題が発生した場合や改善提案がある場合は、[Issues](https://github.com/horiken1977/tags/issues) で報告してください。
-
----
-
-**Powered by Claude Code** 🤖
+技術的な問題や質問がある場合は、Issues で報告してください。

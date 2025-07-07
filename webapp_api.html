@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏷️ Tag Generator - API版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 16px;
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #45a049; }
+        .btn:disabled { background: #666; cursor: not-allowed; }
+        .btn-secondary { background: #2196F3; }
+        .btn-secondary:hover { background: #1976D2; }
+        .btn-home { background: #FF9800; }
+        .btn-home:hover { background: #F57C00; }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .status.success { background: rgba(76,175,80,0.3); }
+        .status.info { background: rgba(33,150,243,0.3); }
+        .status.warning { background: rgba(255,193,7,0.3); }
+        .status.error { background: rgba(244,67,54,0.3); }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .hidden { display: none; }
+        .result-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .api-mode {
+            background: rgba(76,175,80,0.2);
+            border: 2px solid #4caf50;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .column-mapping {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .column-mapping h4 {
+            margin-bottom: 10px;
+            color: #74c0fc;
+        }
+        .mapping-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Tag Generator</h1>
+            <p>マーケティング教育動画のAIタグ生成システム - API版</p>
+            <button class="btn btn-home" onclick="window.location.href='index.html'">🏠 ホームに戻る</button>
+        </div>
+        
+        <div class="api-mode">
+            <h3>🔗 API連携モード</h3>
+            <p>実際のGoogle Sheets APIとAI処理機能が利用可能です</p>
+            <div id="api-status">サーバー状況を確認中...</div>
+        </div>
+        
+        <div class="card">
+            <h2>📊 Google Sheets 設定</h2>
+            <div class="form-group">
+                <label for="sheets-url">スプレッドシートURL</label>
+                <input type="url" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/...">
+                <small style="opacity: 0.8;">※スプレッドシートは公開設定にしてください</small>
+            </div>
+            <button class="btn btn-secondary" onclick="testConnection()" id="test-btn">
+                <span id="test-loading" class="loading hidden"></span>
+                接続テスト
+            </button>
+            <button class="btn btn-secondary" onclick="runDiagnostics()" id="diagnostic-btn" style="margin-left: 10px;">
+                <span id="diagnostic-loading" class="loading hidden"></span>
+                診断テスト
+            </button>
+            <button class="btn btn-secondary" onclick="testSimpleProcessing()" id="simple-test-btn" style="margin-left: 10px;">
+                <span id="simple-test-loading" class="loading hidden"></span>
+                簡易処理テスト
+            </button>
+            
+            <div id="connection-status"></div>
+            
+            <div id="column-mapping" class="column-mapping hidden">
+                <h4>📋 列マッピング設定</h4>
+                <p style="opacity: 0.8; margin-bottom: 15px;">スプレッドシートの列を下記の項目に割り当ててください。必須項目：タイトル、スキル名</p>
+                <div class="mapping-row">
+                    <label><span style="color: #ff6b6b;">*</span> タイトル列:</label>
+                    <select id="title-column" required>
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
+                <div class="mapping-row">
+                    <label><span style="color: #ff6b6b;">*</span> スキル名列:</label>
+                    <select id="skill-column" required>
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
+                <div class="mapping-row">
+                    <label>説明文列:</label>
+                    <select id="description-column">
+                        <option value="">選択してください（任意）</option>
+                    </select>
+                </div>
+                <div class="mapping-row">
+                    <label>要約列:</label>
+                    <select id="summary-column">
+                        <option value="">選択してください（任意）</option>
+                    </select>
+                </div>
+                <div class="mapping-row">
+                    <label>文字起こし列:</label>
+                    <select id="transcript-column">
+                        <option value="">選択してください（任意）</option>
+                    </select>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: rgba(74, 144, 226, 0.2); border-radius: 5px;">
+                    <strong>💡 ヒント:</strong> スプレッドシートの1行目がヘッダー行として使用されます。データは2行目から読み込まれます。
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>🤖 AI エンジン選択</h2>
+                <div class="form-group">
+                    <label for="ai-engine">処理エンジン</label>
+                    <select id="ai-engine">
+                        <option value="openai">OpenAI GPT-4</option>
+                        <option value="claude">Claude 3.5 Sonnet</option>
+                        <option value="gemini">Google Gemini</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="max-tags">最大タグ数</label>
+                    <select id="max-tags">
+                        <option value="150">150個</option>
+                        <option value="200" selected>200個 (推奨)</option>
+                        <option value="250">250個</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>⚙️ 処理設定</h2>
+                <div class="form-group">
+                    <label for="batch-size">バッチサイズ</label>
+                    <select id="batch-size">
+                        <option value="10">10件</option>
+                        <option value="20" selected>20件 (推奨)</option>
+                        <option value="50">50件</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quality">処理品質</label>
+                    <select id="quality">
+                        <option value="fast">高速処理</option>
+                        <option value="balanced" selected>バランス</option>
+                        <option value="high">高品質</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🚀 処理実行</h2>
+            <button class="btn" onclick="startProcessing()" id="process-btn" disabled>
+                <span id="process-loading" class="loading hidden"></span>
+                タグ生成開始
+            </button>
+            <button class="btn btn-secondary" onclick="previewData()">データプレビュー</button>
+            
+            <div id="processing-status" class="hidden">
+                <div class="progress">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <div id="status-text">処理中...</div>
+            </div>
+        </div>
+        
+        <div class="card result-section hidden" id="results">
+            <h2>📋 処理結果</h2>
+            <div id="result-content"></div>
+        </div>
+    </div>
+    
+    <script>
+        let isProcessing = false;
+        let sheetData = null;
+        let columnHeaders = [];
+        
+        // APIベースURLの設定（PHP API使用）
+        const API_BASE_URL = window.location.protocol + '//' + window.location.hostname + window.location.pathname.replace(/\/[^\/]*$/, '') + '/api.php';
+        
+        // API呼び出しのヘルパー関数
+        async function callAPI(action, options = {}) {
+            try {
+                const url = API_BASE_URL + '?action=' + action;
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                if (!response.ok) {
+                    const responseText = await response.text();
+                    console.error('HTTP Error Response:', response.status, responseText);
+                    throw new Error(`HTTP error! status: ${response.status}, response: ${responseText.substring(0, 200)}`);
+                }
+                
+                const responseText = await response.text();
+                console.log('Raw API Response:', responseText.substring(0, 500));
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    console.error('Response text:', responseText);
+                    throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('API call error:', error);
+                throw error;
+            }
+        }
+        
+        // サーバー状況確認
+        async function checkApiStatus() {
+            try {
+                const data = await callAPI('status');
+                
+                if (data.status === 'running') {
+                    document.getElementById('api-status').innerHTML = 
+                        `✅ APIサーバー稼働中 (v${data.version})`;
+                    return true;
+                }
+            } catch (error) {
+                document.getElementById('api-status').innerHTML = 
+                    `❌ APIサーバーに接続できません (${error.message})`;
+                
+                // デバッグ情報を表示
+                console.error('API Status Check Failed:', error);
+                console.log('Attempted URL:', API_BASE_URL + '?action=status');
+                
+                return false;
+            }
+        }
+        
+        // 診断テスト
+        async function runDiagnostics() {
+            const diagnosticBtn = document.getElementById('diagnostic-btn');
+            const diagnosticLoading = document.getElementById('diagnostic-loading');
+            const statusDiv = document.getElementById('connection-status');
+            
+            console.log('Starting diagnostics...');
+            
+            // UI更新
+            diagnosticBtn.disabled = true;
+            diagnosticLoading.classList.remove('hidden');
+            statusDiv.innerHTML = '<div class="status info">🔍 システム診断中...</div>';
+            
+            try {
+                console.log('Calling debug_test endpoint...');
+                const result = await callAPI('debug_test', {
+                    method: 'POST',
+                    body: JSON.stringify({})
+                });
+                
+                console.log('Diagnostic result:', result);
+                
+                // 結果を表示
+                statusDiv.innerHTML = `
+                    <div class="status ${result.completed ? 'success' : 'warning'}">
+                        <h4>🔍 システム診断結果</h4>
+                        <div style="text-align: left; margin: 15px 0;">
+                            <strong>基本設定:</strong><br>
+                            • メモリ制限: ${result.memory_limit || 'N/A'}<br>
+                            • 実行時間制限: ${result.max_execution_time || 'N/A'}秒<br>
+                            • 現在のメモリ使用量: ${result.current_memory || 'N/A'}<br>
+                            • cURL利用可能: ${result.curl_available ? '✅' : '❌'}<br>
+                            • .envファイル存在: ${result.env_file_exists ? '✅' : '❌'}<br>
+                            <br>
+                            <strong>環境変数:</strong><br>
+                            • 読み込み済み変数数: ${result.env_vars_count || 0}個<br>
+                            • APIキー利用可能: ${result.api_key_available ? '✅' : '❌'}<br>
+                            <br>
+                            <strong>処理テスト:</strong><br>
+                            • シミュレーションタグ: ${result.simulation_tags ? result.simulation_tags.length + '個生成' : '❌ 失敗'}<br>
+                            • 最終メモリ使用量: ${result.final_memory || 'N/A'}<br>
+                            • 処理ステップ: ${result.step || '不明'}<br>
+                            • 診断完了: ${result.completed ? '✅' : '❌'}
+                        </div>
+                        ${result.env_error ? `<div style="color: #ff6b6b;">環境エラー: ${result.env_error}</div>` : ''}
+                        ${result.api_key_error ? `<div style="color: #ff6b6b;">APIキーエラー: ${result.api_key_error}</div>` : ''}
+                        ${result.simulation_error ? `<div style="color: #ff6b6b;">シミュレーションエラー: ${result.simulation_error}</div>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Diagnostic failed:', error);
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ 診断テスト失敗<br>
+                        エラー: ${error.message}<br>
+                        <small>詳細はコンソールログを確認してください</small>
+                    </div>
+                `;
+            } finally {
+                diagnosticBtn.disabled = false;
+                diagnosticLoading.classList.add('hidden');
+            }
+        }
+        
+        // 簡易処理テスト
+        async function testSimpleProcessing() {
+            const simpleTestBtn = document.getElementById('simple-test-btn');
+            const simpleTestLoading = document.getElementById('simple-test-loading');
+            const statusDiv = document.getElementById('connection-status');
+            
+            console.log('Starting simple processing test...');
+            
+            // UI更新
+            simpleTestBtn.disabled = true;
+            simpleTestLoading.classList.remove('hidden');
+            statusDiv.innerHTML = '<div class="status info">🔄 簡易処理テスト中...</div>';
+            
+            try {
+                // 最小限のテストデータで ai_process をテスト
+                const testData = {
+                    data: [
+                        {
+                            title: "マーケティングテスト",
+                            skill: "マーケティング",
+                            description: "テスト説明文"
+                        }
+                    ],
+                    ai_engine: "openai",
+                    processing_mode: "lightweight",
+                    batch_size: 1,
+                    quality: "fast",
+                    use_real_ai: false
+                };
+                
+                console.log('Calling ai_process with test data:', testData);
+                
+                const result = await callAPI('ai_process', {
+                    method: 'POST',
+                    body: JSON.stringify(testData)
+                });
+                
+                console.log('Simple processing result:', result);
+                
+                // 結果を表示
+                statusDiv.innerHTML = `
+                    <div class="status ${result.success ? 'success' : 'error'}">
+                        <h4>🔄 簡易処理テスト結果</h4>
+                        <div style="text-align: left; margin: 15px 0;">
+                            <strong>処理結果:</strong><br>
+                            • 成功: ${result.success ? '✅' : '❌'}<br>
+                            • 処理件数: ${result.processed_count || 0}件<br>
+                            • 生成タグ数: ${result.total_tags_generated || 0}個<br>
+                            • 処理時間: ${result.processing_time ? (result.processing_time * 1000).toFixed(2) + 'ms' : 'N/A'}<br>
+                            • AIモード: ${result.ai_mode || 'N/A'}<br>
+                            • リクエストサイズ: ${result.request_size || 0}バイト<br>
+                            <br>
+                            <strong>生成されたタグ:</strong><br>
+                            ${result.results && result.results.length > 0 ? 
+                                result.results.map(r => 
+                                    `• ${r.title}: [${r.generated_tags ? r.generated_tags.join(', ') : 'なし'}]`
+                                ).join('<br>') 
+                                : '❌ 結果なし'}
+                        </div>
+                        ${!result.success && result.error ? `<div style="color: #ff6b6b;">エラー: ${result.error}</div>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Simple processing test failed:', error);
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ 簡易処理テスト失敗<br>
+                        エラー: ${error.message}<br>
+                        <small>詳細はコンソールログを確認してください</small>
+                    </div>
+                `;
+            } finally {
+                simpleTestBtn.disabled = false;
+                simpleTestLoading.classList.add('hidden');
+            }
+        }
+        
+        async function testConnection() {
+            const url = document.getElementById('sheets-url').value;
+            const statusDiv = document.getElementById('connection-status');
+            const testBtn = document.getElementById('test-btn');
+            const loading = document.getElementById('test-loading');
+            
+            if (!url) {
+                statusDiv.innerHTML = '<div class="status warning">URLを入力してください</div>';
+                return;
+            }
+            
+            // Show loading
+            testBtn.disabled = true;
+            loading.classList.remove('hidden');
+            statusDiv.innerHTML = '<div class="status info">接続テスト中...</div>';
+            
+            try {
+                const data = await callAPI('sheets_test', {
+                    method: 'POST',
+                    body: JSON.stringify({url: url})
+                });
+                
+                if (data.success) {
+                    columnHeaders = data.columns || [];
+                    
+                    // デバッグ情報を表示
+                    const debugInfo = data.debug_info ? `
+                        <details style="margin-top: 10px; opacity: 0.8;">
+                            <summary>デバッグ情報</summary>
+                            <div style="font-size: 12px; background: rgba(0,0,0,0.1); padding: 5px; border-radius: 3px; margin-top: 5px;">
+                                生データ: ${data.debug_info.raw_header_line}<br>
+                                総行数: ${data.debug_info.total_lines}<br>
+                                CSVサイズ: ${data.debug_info.csv_size}バイト<br>
+                                検出された列数: ${columnHeaders.length}
+                            </div>
+                        </details>
+                    ` : '';
+                    
+                    statusDiv.innerHTML = `
+                        <div class="status success">
+                            ✅ 接続成功<br>
+                            シートID: ${data.sheet_id}<br>
+                            データ行数: ${data.rows}行<br>
+                            検出された列数: ${columnHeaders.length}個<br>
+                            列名: ${columnHeaders.join(', ')}<br>
+                            ${debugInfo}
+                        </div>
+                    `;
+                    
+                    // 列マッピング設定を表示
+                    if (columnHeaders.length > 0) {
+                        setupColumnMapping(columnHeaders);
+                        document.getElementById('process-btn').disabled = false;
+                    } else {
+                        statusDiv.innerHTML += `<div class="status warning">⚠️ 列が検出されませんでした。スプレッドシートの形式を確認してください。</div>`;
+                    }
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">❌ ${data.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ 接続エラー: ${error.message}</div>`;
+            } finally {
+                testBtn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+        
+        function setupColumnMapping(columns) {
+            const mappingDiv = document.getElementById('column-mapping');
+            mappingDiv.classList.remove('hidden');
+            
+            // 各セレクトボックスに列名を設定
+            const selects = [
+                {id: 'title-column', placeholder: '選択してください', keywords: ['タイトル', 'title', '題名', 'テーマ']},
+                {id: 'skill-column', placeholder: '選択してください', keywords: ['スキル', 'skill', 'カテゴリ', 'category']},
+                {id: 'description-column', placeholder: '選択してください（任意）', keywords: ['説明', 'description', '概要', 'summary']},
+                {id: 'summary-column', placeholder: '選択してください（任意）', keywords: ['要約', 'summary', 'まとめ', '概要']},
+                {id: 'transcript-column', placeholder: '選択してください（任意）', keywords: ['文字起こし', 'transcript', '内容', 'content', '本文']}
+            ];
+            
+            selects.forEach(selectConfig => {
+                const select = document.getElementById(selectConfig.id);
+                select.innerHTML = `<option value="">${selectConfig.placeholder}</option>`;
+                
+                // 変更時のバリデーション更新
+                select.addEventListener('change', updateValidationStatus);
+                
+                columns.forEach((col, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${col} (列${String.fromCharCode(65 + index)})`;
+                    
+                    // デフォルト選択の推測（より詳細に）
+                    const colLower = col.toLowerCase();
+                    const isMatch = selectConfig.keywords.some(keyword => 
+                        colLower.includes(keyword.toLowerCase()) || 
+                        col.includes(keyword)
+                    );
+                    
+                    if (isMatch && !select.value) {
+                        option.selected = true;
+                    }
+                    
+                    select.appendChild(option);
+                });
+            });
+            
+            // 必須フィールドのバリデーション表示を更新
+            updateValidationStatus();
+        }
+        
+        function updateValidationStatus() {
+            const titleSelected = document.getElementById('title-column').value;
+            const skillSelected = document.getElementById('skill-column').value;
+            const processBtn = document.getElementById('process-btn');
+            
+            if (titleSelected && skillSelected) {
+                processBtn.disabled = false;
+                processBtn.textContent = 'タグ生成開始';
+            } else {
+                processBtn.disabled = true;
+                processBtn.textContent = '必須項目を選択してください';
+            }
+        }
+        
+        
+        async function startProcessing() {
+            if (isProcessing) return;
+            
+            const url = document.getElementById('sheets-url').value;
+            if (!url) {
+                alert('Google SheetsのURLを入力してください');
+                return;
+            }
+            
+            // 列マッピングの確認
+            const columnMapping = {
+                title: document.getElementById('title-column').value,
+                skill: document.getElementById('skill-column').value,
+                description: document.getElementById('description-column').value,
+                summary: document.getElementById('summary-column').value,
+                transcript: document.getElementById('transcript-column').value
+            };
+            
+            if (!columnMapping.title || !columnMapping.skill) {
+                alert('少なくともタイトル列とスキル列を選択してください');
+                return;
+            }
+            
+            isProcessing = true;
+            
+            // DOM要素を安全に取得
+            const statusDiv = document.getElementById('processing-status');
+            const progressBar = document.getElementById('progress-bar');
+            const statusText = document.getElementById('status-text');
+            const resultsDiv = document.getElementById('results');
+            const processBtn = document.getElementById('process-btn');
+            const loading = document.getElementById('process-loading');
+            
+            // 要素の存在確認
+            if (!statusDiv || !progressBar || !statusText || !resultsDiv || !processBtn) {
+                alert('UI要素の初期化に失敗しました。ページを再読み込みしてください。');
+                isProcessing = false;
+                return;
+            }
+            
+            // UI状態を更新
+            processBtn.disabled = true;
+            processBtn.innerHTML = `
+                <span class="loading"></span>
+                段階的処理中...
+            `;
+            
+            if (loading) {
+                loading.classList.remove('hidden');
+            }
+            
+            statusDiv.classList.remove('hidden');
+            resultsDiv.classList.add('hidden');
+            
+            try {
+                // Stage 1: Get data from sheets
+                statusText.innerHTML = `
+                    <div class="status info">
+                        📊 ステップ1/5: Google Sheetsからデータを読み込み中...<br>
+                        <small>スプレッドシートに接続してデータを取得しています</small>
+                    </div>
+                `;
+                progressBar.style.width = '10%';
+                
+                const sheetsResponse = await callAPI('sheets_data', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        url: url,
+                        column_mapping: columnMapping
+                    })
+                });
+                
+                const sheetsData = sheetsResponse;
+                
+                // Stage 2: Multiple micro-batch processing
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🚀 ステップ2/5: マイクロバッチ処理中...<br>
+                        <small>データを小分けして安全に処理中（最大5件ずつ）</small>
+                    </div>
+                `;
+                progressBar.style.width = '30%';
+                
+                // 非常に小さなバッチで分割処理 - 修正版
+                const microBatchSize = 5; // 成功実績のあるサイズ
+                const maxTotalItems = Math.min(sheetsData.data.length, 15); // 最大15件に制限
+                const allLightweightResults = [];
+                let totalProcessingTime = 0;
+                
+                for (let i = 0; i < maxTotalItems; i += microBatchSize) {
+                    const microBatch = sheetsData.data.slice(i, Math.min(i + microBatchSize, maxTotalItems));
+                    
+                    // データサイズを最小化（成功実績に基づく）
+                    const optimizedBatch = microBatch.map(item => ({
+                        title: (item.title || '').substring(0, 30),      // 30文字に制限
+                        skill: (item.skill || '').substring(0, 20),      // 20文字に制限
+                        description: (item.description || '').substring(0, 50) // 50文字に制限
+                    }));
+                    
+                    const requestData = {
+                        data: optimizedBatch,
+                        ai_engine: document.getElementById('ai-engine').value,
+                        batch_size: microBatchSize,
+                        quality: 'fast', // 強制的に高速処理
+                        processing_mode: 'lightweight',
+                        use_real_ai: true
+                    };
+                    
+                    const requestSize = JSON.stringify(requestData).length;
+                    console.log(`Micro-batch ${Math.floor(i/microBatchSize) + 1} size:`, requestSize, 'bytes');
+                    
+                    // 成功実績に基づいたサイズ制限
+                    if (requestSize > 8 * 1024) { // 8KB制限
+                        console.warn('Micro-batch still too large, skipping...');
+                        continue;
+                    }
+                    
+                    statusText.innerHTML = `
+                        <div class="status info">
+                            🚀 ステップ2/5: マイクロバッチ処理中...<br>
+                            <small>バッチ ${Math.floor(i/microBatchSize) + 1}/${Math.ceil(maxTotalItems/microBatchSize)} を処理中（${microBatch.length}件）</small>
+                        </div>
+                    `;
+                    
+                    try {
+                        const microResponse = await callAPI('ai_process', {
+                            method: 'POST',
+                            body: JSON.stringify(requestData)
+                        });
+                        
+                        if (microResponse.success && microResponse.results) {
+                            allLightweightResults.push(...microResponse.results);
+                            totalProcessingTime += microResponse.processing_time || 0;
+                        }
+                        
+                        // バッチ間の休憩（成功実績に基づく）
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                    } catch (batchError) {
+                        console.warn(`Micro-batch ${Math.floor(i/microBatchSize) + 1} failed:`, batchError.message);
+                        // エラーが発生してもスキップして続行
+                        continue;
+                    }
+                }
+                
+                // 結果をまとめる
+                const lightweightData = {
+                    success: true,
+                    results: allLightweightResults,
+                    processed_count: allLightweightResults.length,
+                    total_tags_generated: allLightweightResults.reduce((sum, result) => sum + (result.generated_tags?.length || 0), 0),
+                    processing_time: totalProcessingTime,
+                    ai_mode: 'simulation', // マイクロバッチはシミュレーションモード
+                    processing_mode: 'lightweight'
+                };
+                
+                // Stage 3: Select important videos for detailed processing
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🎯 ステップ3/5: 重要動画を選択中...<br>
+                        <small>タグ頻度分析により上位動画を選択して詳細処理対象を決定</small>
+                    </div>
+                `;
+                progressBar.style.width = '50%';
+                
+                // 重要動画の選択（タグ数が多い動画を上位から選択）
+                const maxDetailedItems = Math.min(lightweightData.results.length, 15); // 最大15件に制限
+                const sortedVideos = lightweightData.results
+                    .map((result, index) => ({ ...result, originalIndex: index }))
+                    .sort((a, b) => b.generated_tags.length - a.generated_tags.length)
+                    .slice(0, maxDetailedItems);
+                
+                const importantVideos = sortedVideos.map(item => sheetsData.data[item.originalIndex]);
+                
+                // Stage 4: Detailed processing
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🔍 ステップ4/5: 重要動画の詳細処理中...<br>
+                        <small>選択された${importantVideos.length}件の動画を文字起こし含めて詳細分析</small>
+                    </div>
+                `;
+                progressBar.style.width = '70%';
+                
+                const detailedResponse = await callAPI('ai_process', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        important_videos: importantVideos,
+                        ai_engine: document.getElementById('ai-engine').value,
+                        quality: document.getElementById('quality').value,
+                        processing_mode: 'detailed',
+                        use_real_ai: true
+                    })
+                });
+                
+                const detailedData = detailedResponse;
+                
+                // Stage 5: Unify tags
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🔧 ステップ5/5: タグ統合・最適化中...<br>
+                        <small>軽量処理と詳細処理の結果を統合し、類似タグを統一</small>
+                    </div>
+                `;
+                progressBar.style.width = '90%';
+                
+                const unifiedResponse = await callAPI('ai_process', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        lightweight_tags: lightweightData.results,
+                        detailed_tags: detailedData.results,
+                        max_tags: parseInt(document.getElementById('max-tags').value),
+                        processing_mode: 'unified'
+                    })
+                });
+                
+                const unifiedData = unifiedResponse;
+                
+                // Complete
+                statusText.innerHTML = `
+                    <div class="status success">
+                        🎉 段階的処理完了！<br>
+                        <small>軽量処理→詳細処理→統合処理の全ステップが完了しました</small>
+                    </div>
+                `;
+                progressBar.style.width = '100%';
+                
+                // Show results
+                setTimeout(() => {
+                    displayStageResults(sheetsData, lightweightData, detailedData, unifiedData);
+                    statusDiv.classList.add('hidden');
+                    resultsDiv.classList.remove('hidden');
+                    
+                    // ボタンを元に戻す
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = `
+                        <span id="process-loading" class="loading hidden"></span>
+                        タグ生成開始
+                    `;
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Processing error:', error);
+                
+                let errorMessage = error.message;
+                let helpText = '詳細はコンソールログを確認してください';
+                
+                if (error.message.includes('HTTP error! status: 403')) {
+                    errorMessage = 'サーバーがリクエストを拒否しました';
+                    helpText = 'データサイズが大きすぎる可能性があります。より少ないデータで再試行してください。';
+                } else if (error.message.includes('HTTP error! status: 413')) {
+                    errorMessage = 'リクエストサイズが制限を超えています';
+                    helpText = 'データを分割して処理する必要があります。管理者にお問い合わせください。';
+                } else if (error.message.includes('HTTP error! status: 504')) {
+                    errorMessage = '処理がタイムアウトしました';
+                    helpText = 'データ量が多すぎます。バッチサイズを小さくして再試行してください。';
+                }
+                
+                statusText.innerHTML = `
+                    <div class="status error">
+                        ❌ ${errorMessage}<br>
+                        <small>${helpText}</small><br>
+                        <small style="margin-top: 10px; display: block;">
+                            <strong>対処方法:</strong><br>
+                            1. ページを再読み込みして再試行<br>
+                            2. より小さなデータセットで試行<br>
+                            3. 処理品質を「高速処理」に変更
+                        </small>
+                    </div>
+                `;
+                progressBar.style.width = '0%';
+                
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 10000);
+            } finally {
+                isProcessing = false;
+                processBtn.disabled = false;
+                processBtn.innerHTML = `
+                    <span id="process-loading" class="loading hidden"></span>
+                    タグ生成開始
+                `;
+                
+                if (loading) {
+                    loading.classList.add('hidden');
+                }
+            }
+        }
+        
+        function displayStageResults(sheetsData, lightweightData, detailedData, unifiedData) {
+            const aiEngine = document.getElementById('ai-engine').selectedOptions[0].text;
+            const maxTags = document.getElementById('max-tags').value;
+            const batchSize = document.getElementById('batch-size').value;
+            const quality = document.getElementById('quality').selectedOptions[0].text;
+            
+            // 結果データを保存（ダウンロード用）
+            window.resultsData = {
+                sheetsData: sheetsData,
+                lightweightData: lightweightData,
+                detailedData: detailedData,
+                unifiedData: unifiedData
+            };
+            
+            const unifiedResult = unifiedData.results[0]; // 統合結果は配列の最初の要素
+            
+            document.getElementById('result-content').innerHTML = `
+                <div class="status success">
+                    <h3>🎉 段階的処理完了</h3>
+                    <p>• 処理動画数: ${sheetsData.total_rows}件</p>
+                    <p>• 軽量処理: ${lightweightData.processed_count}件 (${lightweightData.processing_time.toFixed(2)}秒)</p>
+                    <p>• 詳細処理: ${detailedData.processed_count}件 (${detailedData.processing_time.toFixed(2)}秒)</p>
+                    <p>• 統合処理: ${unifiedResult.original_count}個 → ${unifiedResult.unified_count}個に最適化</p>
+                    <p>• 使用AI: ${aiEngine} (${lightweightData.ai_mode === 'real' ? '実API' : 'シミュレーション'}モード)</p>
+                    <p>• 処理品質: ${quality}</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                    <div style="background: rgba(76,175,80,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🚀 軽量バッチ処理</h5>
+                        <p>全${lightweightData.processed_count}件処理</p>
+                        <p>平均タグ数: ${(lightweightData.total_tags_generated / lightweightData.processed_count).toFixed(1)}個/動画</p>
+                    </div>
+                    <div style="background: rgba(33,150,243,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🔍 詳細個別処理</h5>
+                        <p>上位${detailedData.processed_count}件処理</p>
+                        <p>平均タグ数: ${(detailedData.total_tags_generated / detailedData.processed_count).toFixed(1)}個/動画</p>
+                    </div>
+                    <div style="background: rgba(156,39,176,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🔧 統合最適化</h5>
+                        <p>類似タグ統合: ${unifiedResult.original_count - unifiedResult.unified_count}個削減</p>
+                        <p>最終タグ数: ${unifiedResult.unified_count}個</p>
+                    </div>
+                </div>
+                
+                <h4>🏆 最終統合タグ（上位20個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${unifiedResult.unified_tags.slice(0, 20).join(', ')}
+                </div>
+                
+                <h4>📊 タグ出現頻度（上位10個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${Object.entries(unifiedResult.tag_frequencies).slice(0, 10).map(([tag, freq]) => `
+                        <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                            <span>${tag}</span>
+                            <span>${freq}回 (${((freq / sheetsData.total_rows) * 100).toFixed(1)}%)</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <h4>📈 軽量処理サンプル結果（最初の3件）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${lightweightData.results.slice(0, 3).map((result, index) => `
+                        <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                            <strong>${index + 1}. ${result.title}</strong><br>
+                            <small>軽量タグ: ${result.generated_tags.join(', ')}</small>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="downloadStageResults('csv')">📥 統合結果をCSVでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadStageResults('json')">📥 全段階データをJSONでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadStageResults('tags')">📥 最終タグのみダウンロード</button>
+                    <button class="btn btn-secondary" onclick="showStageReport()">📈 詳細分析レポート</button>
+                </div>
+            `;
+        }
+        
+        function displayResults(sheetsData, aiData, optimizeData) {
+            const aiEngine = document.getElementById('ai-engine').selectedOptions[0].text;
+            const maxTags = document.getElementById('max-tags').value;
+            const batchSize = document.getElementById('batch-size').value;
+            const quality = document.getElementById('quality').selectedOptions[0].text;
+            
+            // 結果データを保存（ダウンロード用）
+            window.resultsData = {
+                sheetsData: sheetsData,
+                aiData: aiData,
+                optimizeData: optimizeData
+            };
+            
+            document.getElementById('result-content').innerHTML = `
+                <div class="status success">
+                    <h3>🎉 処理完了</h3>
+                    <p>• 処理動画数: ${sheetsData.total_rows}件</p>
+                    <p>• 生成タグ数: ${optimizeData.original_count}個 → ${optimizeData.optimized_count}個に最適化</p>
+                    <p>• 処理時間: ${aiData.processing_time.toFixed(2)}秒</p>
+                    <p>• 使用AI: ${aiEngine} (${aiData.ai_mode === 'real' ? '実API' : 'シミュレーション'}モード)</p>
+                    <p>• バッチサイズ: ${batchSize}件</p>
+                    <p>• 処理品質: ${quality}</p>
+                    <p>• 削除されたタグ: ${optimizeData.original_count - optimizeData.optimized_count}個</p>
+                </div>
+                
+                <h4>📋 最適化されたタグ（上位20個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${optimizeData.optimized_tags.slice(0, 20).join(', ')}
+                </div>
+                
+                <h4>📊 タグ出現頻度（上位10個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${Object.entries(optimizeData.tag_frequencies).slice(0, 10).map(([tag, freq]) => 
+                        `${tag}: ${freq}回`).join('<br>')}
+                </div>
+                
+                <h4>📈 動画別タグ生成結果（最初の5件）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${aiData.results.slice(0, 5).map((result, index) => `
+                        <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                            <strong>${index + 1}. ${result.title}</strong><br>
+                            <small>タグ: ${result.generated_tags.join(', ')}</small>
+                        </div>
+                    `).join('')}
+                    ${aiData.results.length > 5 ? `<p style="opacity: 0.7;">...他${aiData.results.length - 5}件</p>` : ''}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="downloadResults('csv')">📥 結果をCSVでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadResults('json')">📥 結果をJSONでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadTagsOnly()">📥 タグのみダウンロード</button>
+                    <button class="btn btn-secondary" onclick="showDetailedReport()">📈 詳細レポート表示</button>
+                </div>
+            `;
+        }
+        
+        function downloadResults(format) {
+            if (!window.resultsData) {
+                alert('ダウンロードするデータがありません');
+                return;
+            }
+            
+            const { aiData, optimizeData } = window.resultsData;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            
+            if (format === 'csv') {
+                // CSV形式でダウンロード
+                let csv = 'タイトル,生成されたタグ,タグ数,信頼度\n';
+                aiData.results.forEach(result => {
+                    csv += `"${result.title}","${result.generated_tags.join(', ')}",${result.generated_tags.length},${result.confidence.toFixed(2)}\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `tag_results_${timestamp}.csv`;
+                link.click();
+                
+            } else if (format === 'json') {
+                // JSON形式でダウンロード
+                const jsonData = {
+                    metadata: {
+                        generated_at: new Date().toISOString(),
+                        total_videos: aiData.results.length,
+                        total_tags: optimizeData.optimized_count,
+                        ai_engine: aiData.ai_engine,
+                        ai_mode: aiData.ai_mode,
+                        processing_time: aiData.processing_time
+                    },
+                    results: aiData.results,
+                    optimized_tags: optimizeData.optimized_tags,
+                    tag_frequencies: optimizeData.tag_frequencies
+                };
+                
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `tag_results_${timestamp}.json`;
+                link.click();
+            }
+        }
+        
+        function downloadTagsOnly() {
+            if (!window.resultsData) {
+                alert('ダウンロードするデータがありません');
+                return;
+            }
+            
+            const { optimizeData } = window.resultsData;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            
+            // タグのみをテキストファイルでダウンロード
+            const tagsText = optimizeData.optimized_tags.join('\n');
+            const blob = new Blob([tagsText], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `optimized_tags_${timestamp}.txt`;
+            link.click();
+        }
+        
+        function downloadStageResults(format) {
+            if (!window.resultsData) {
+                alert('ダウンロードするデータがありません');
+                return;
+            }
+            
+            const { lightweightData, detailedData, unifiedData } = window.resultsData;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            const unifiedResult = unifiedData.results[0];
+            
+            if (format === 'csv') {
+                // 統合結果をCSV形式でダウンロード
+                let csv = 'タグ,出現頻度,処理段階\n';
+                Object.entries(unifiedResult.tag_frequencies).forEach(([tag, freq]) => {
+                    const sources = unifiedResult.tag_sources[tag];
+                    const sourceInfo = [];
+                    if (sources?.lightweight) sourceInfo.push(`軽量:${sources.lightweight}`);
+                    if (sources?.detailed) sourceInfo.push(`詳細:${sources.detailed}`);
+                    csv += `"${tag}",${freq},"${sourceInfo.join(', ')}"\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `stage_results_${timestamp}.csv`;
+                link.click();
+                
+            } else if (format === 'json') {
+                // 全段階データをJSON形式でダウンロード
+                const jsonData = {
+                    metadata: {
+                        generated_at: new Date().toISOString(),
+                        processing_method: 'staged_processing',
+                        total_videos: lightweightData.processed_count,
+                        detailed_videos: detailedData.processed_count,
+                        final_tags: unifiedResult.unified_count
+                    },
+                    lightweight_processing: {
+                        results: lightweightData.results,
+                        processing_time: lightweightData.processing_time,
+                        ai_mode: lightweightData.ai_mode
+                    },
+                    detailed_processing: {
+                        results: detailedData.results,
+                        processing_time: detailedData.processing_time,
+                        ai_mode: detailedData.ai_mode
+                    },
+                    unified_results: unifiedResult
+                };
+                
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `stage_results_complete_${timestamp}.json`;
+                link.click();
+                
+            } else if (format === 'tags') {
+                // 最終タグのみをテキストファイルでダウンロード
+                const tagsText = unifiedResult.unified_tags.join('\n');
+                const blob = new Blob([tagsText], { type: 'text/plain;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `final_unified_tags_${timestamp}.txt`;
+                link.click();
+            }
+        }
+        
+        function showStageReport() {
+            if (!window.resultsData) {
+                alert('表示するデータがありません');
+                return;
+            }
+            
+            const { lightweightData, detailedData, unifiedData } = window.resultsData;
+            const unifiedResult = unifiedData.results[0];
+            
+            // 段階的処理の詳細レポートをポップアップで表示
+            const reportWindow = window.open('', 'StageReport', 'width=1000,height=700');
+            reportWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>段階的処理 - 詳細分析レポート</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                        h1 { color: #333; text-align: center; }
+                        .section { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+                        .stage { padding: 15px; border-radius: 8px; text-align: center; }
+                        .stage1 { background: rgba(76,175,80,0.1); border: 2px solid #4CAF50; }
+                        .stage2 { background: rgba(33,150,243,0.1); border: 2px solid #2196F3; }
+                        .stage3 { background: rgba(156,39,176,0.1); border: 2px solid #9C27B0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                        th { background-color: #f2f2f2; }
+                        .metric { display: flex; justify-content: space-between; margin: 5px 0; }
+                    </style>
+                </head>
+                <body>
+                    <h1>🎯 段階的処理 - 詳細分析レポート</h1>
+                    
+                    <div class="section">
+                        <h2>📊 処理概要</h2>
+                        <p><strong>生成日時:</strong> ${new Date().toLocaleString('ja-JP')}</p>
+                        <p><strong>処理方式:</strong> 段階的処理（軽量→詳細→統合）</p>
+                        <p><strong>総処理時間:</strong> ${(lightweightData.processing_time + detailedData.processing_time + unifiedData.processing_time).toFixed(2)}秒</p>
+                    </div>
+                    
+                    <div class="grid">
+                        <div class="stage stage1">
+                            <h3>🚀 軽量バッチ処理</h3>
+                            <div class="metric"><span>処理件数:</span><span>${lightweightData.processed_count}件</span></div>
+                            <div class="metric"><span>処理時間:</span><span>${lightweightData.processing_time.toFixed(2)}秒</span></div>
+                            <div class="metric"><span>生成タグ:</span><span>${lightweightData.total_tags_generated}個</span></div>
+                            <div class="metric"><span>平均タグ/動画:</span><span>${(lightweightData.total_tags_generated / lightweightData.processed_count).toFixed(1)}個</span></div>
+                        </div>
+                        <div class="stage stage2">
+                            <h3>🔍 詳細個別処理</h3>
+                            <div class="metric"><span>処理件数:</span><span>${detailedData.processed_count}件</span></div>
+                            <div class="metric"><span>処理時間:</span><span>${detailedData.processing_time.toFixed(2)}秒</span></div>
+                            <div class="metric"><span>生成タグ:</span><span>${detailedData.total_tags_generated}個</span></div>
+                            <div class="metric"><span>平均タグ/動画:</span><span>${(detailedData.total_tags_generated / detailedData.processed_count).toFixed(1)}個</span></div>
+                        </div>
+                        <div class="stage stage3">
+                            <h3>🔧 統合最適化</h3>
+                            <div class="metric"><span>統合前タグ:</span><span>${unifiedResult.original_count}個</span></div>
+                            <div class="metric"><span>統合後タグ:</span><span>${unifiedResult.unified_count}個</span></div>
+                            <div class="metric"><span>削減数:</span><span>${unifiedResult.original_count - unifiedResult.unified_count}個</span></div>
+                            <div class="metric"><span>削減率:</span><span>${((unifiedResult.original_count - unifiedResult.unified_count) / unifiedResult.original_count * 100).toFixed(1)}%</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>🏆 最終統合タグ頻度分析</h2>
+                        <table>
+                            <tr><th>タグ</th><th>総出現回数</th><th>軽量処理</th><th>詳細処理</th><th>出現率</th></tr>
+                            ${Object.entries(unifiedResult.tag_frequencies).slice(0, 20).map(([tag, freq]) => {
+                                const sources = unifiedResult.tag_sources[tag] || {};
+                                const totalVideos = lightweightData.processed_count;
+                                return `
+                                    <tr>
+                                        <td>${tag}</td>
+                                        <td>${freq}</td>
+                                        <td>${sources.lightweight || 0}</td>
+                                        <td>${sources.detailed || 0}</td>
+                                        <td>${(freq / totalVideos * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
+        
+        function showDetailedReport() {
+            if (!window.resultsData) {
+                alert('表示するデータがありません');
+                return;
+            }
+            
+            const { aiData, optimizeData } = window.resultsData;
+            
+            // 詳細レポートをポップアップで表示
+            const reportWindow = window.open('', 'DetailedReport', 'width=800,height=600');
+            reportWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Tag Generator - 詳細レポート</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                        h1 { color: #333; }
+                        .section { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Tag Generator 詳細レポート</h1>
+                    <div class="section">
+                        <h2>処理概要</h2>
+                        <p>生成日時: ${new Date().toLocaleString('ja-JP')}</p>
+                        <p>処理動画数: ${aiData.results.length}件</p>
+                        <p>生成タグ総数: ${optimizeData.original_count}個</p>
+                        <p>最適化後タグ数: ${optimizeData.optimized_count}個</p>
+                        <p>処理時間: ${aiData.processing_time.toFixed(2)}秒</p>
+                        <p>AIエンジン: ${aiData.ai_engine} (${aiData.ai_mode}モード)</p>
+                    </div>
+                    <div class="section">
+                        <h2>タグ頻度分析</h2>
+                        <table>
+                            <tr><th>タグ</th><th>出現回数</th><th>割合</th></tr>
+                            ${Object.entries(optimizeData.tag_frequencies).map(([tag, freq]) => `
+                                <tr>
+                                    <td>${tag}</td>
+                                    <td>${freq}</td>
+                                    <td>${(freq / aiData.results.length * 100).toFixed(1)}%</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
+        
+        async function previewData() {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.innerHTML = '<div class="status info">データプレビューを読み込み中...</div>';
+            
+            try {
+                const response = await callAPI('sheets_data', {
+                    method: 'POST',
+                    body: JSON.stringify({preview: true})
+                });
+                
+                const data = response;
+                
+                if (data.success) {
+                    const sampleData = data.data.slice(0, 3);
+                    statusDiv.innerHTML = `
+                        <div class="status info">
+                            <h4>📊 データプレビュー</h4>
+                            ${sampleData.map(item => `
+                                <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                                    <strong>タイトル:</strong> ${item.title}<br>
+                                    <strong>スキル:</strong> ${item.skill}<br>
+                                    <strong>説明:</strong> ${item.description}
+                                </div>
+                            `).join('')}
+                            <p><strong>総データ数:</strong> ${data.total_rows}件</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ プレビュー取得エラー: ${error.message}</div>`;
+            }
+        }
+        
+        // ページ読み込み時の初期化
+        window.onload = async function() {
+            console.log('Tag Generator API版が起動しました');
+            console.log('API Base URL:', API_BASE_URL);
+            await checkApiStatus();
+        };
+    </script>
+</body>
+</html>

@@ -1,3 +1,10 @@
+# API Keys and sensitive data
+.env
+config/api_keys.json
+service_account.json
+*.key
+*.pem
+
 # Python
 __pycache__/
 *.py[cod]
@@ -42,14 +49,15 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-backups/
-*.backup
+# Logs
 *.log
 logs/
-.chat_backup_config.json
-progress_data.js
+
+# Streamlit
+.streamlit/secrets.toml
 
 # Temporary files
 *.tmp
 *.temp
+cache/
+temp/

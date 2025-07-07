@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏷️ Tag Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #45a049; }
+        .btn-secondary { background: #2196F3; }
+        .btn-secondary:hover { background: #1976D2; }
+        .btn-api { background: #FF5722; }
+        .btn-api:hover { background: #E64A19; }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .feature-card h3 {
+            margin-top: 0;
+            color: #74c0fc;
+        }
+        .status {
+            background: rgba(76,175,80,0.3);
+            border: 2px solid rgba(76,175,80,0.5);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .app-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s;
+        }
+        .app-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255,255,255,0.4);
+        }
+        .version-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Tag Generator</h1>
+            <p>マーケティング教育動画のAIタグ生成システム</p>
+        </div>
+        
+        <div class="status">
+            <h2>✅ システム稼働中</h2>
+            <p>デモ版とAPI連携版の両方が利用可能です</p>
+        </div>
+        
+        <div class="app-grid">
+            <div class="app-card">
+                <h2>📱 デモ版</h2>
+                <span class="version-badge">v1.0</span>
+                <p>シミュレーション機能でUIをお試し</p>
+                <ul style="text-align: left; margin: 15px 0;">
+                    <li>✅ フル機能UI体験</li>
+                    <li>✅ 処理フローの確認</li>
+                    <li>✅ 結果表示のプレビュー</li>
+                    <li>🔄 シミュレーションデータ</li>
+                </ul>
+                <a href="webapp.html" class="btn">🚀 デモ版を開く</a>
+            </div>
+            
+            <div class="app-card">
+                <h2>🔗 API連携版</h2>
+                <span class="version-badge">v2.0</span>
+                <p>実際のGoogle Sheets API連携</p>
+                <ul style="text-align: left; margin: 15px 0;">
+                    <li>✅ Google Sheets接続</li>
+                    <li>✅ リアルタイム処理</li>
+                    <li>✅ AI エンジン連携</li>
+                    <li>⚡ パフォーマンス最適化</li>
+                </ul>
+                <a href="webapp_api.html" class="btn btn-api">⚡ API版を開く</a>
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature-card">
+                <h3>🤖 AI エンジン</h3>
+                <ul>
+                    <li>OpenAI GPT-4</li>
+                    <li>Claude 3.5 Sonnet</li>
+                    <li>Google Gemini</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📊 データ処理</h3>
+                <ul>
+                    <li>400動画の一括処理</li>
+                    <li>6000タグ→200タグ最適化</li>
+                    <li>重複排除・重要度スコアリング</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🔐 セキュリティ</h3>
+                <ul>
+                    <li>OAuth 2.0認証</li>
+                    <li>API キー暗号化管理</li>
+                    <li>HTTPS通信</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🌐 インターフェース</h3>
+                <ul>
+                    <li>レスポンシブWebUI</li>
+                    <li>リアルタイム進捗表示</li>
+                    <li>結果ダウンロード</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📋 使用方法</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <h3>🎯 デモ版</h3>
+                    <ol>
+                        <li>「デモ版を開く」をクリック</li>
+                        <li>各種設定を調整</li>
+                        <li>「タグ生成開始」で体験</li>
+                        <li>シミュレーション結果を確認</li>
+                    </ol>
+                </div>
+                <div>
+                    <h3>⚡ API連携版</h3>
+                    <ol>
+                        <li>「API版を開く」をクリック</li>
+                        <li>Google Sheets URLを入力</li>
+                        <li>接続テストで確認</li>
+                        <li>AI処理を実行</li>
+                        <li>実際の結果をダウンロード</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🔧 技術仕様</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                    <h4>バックエンド</h4>
+                    <ul>
+                        <li>Python 3.8</li>
+                        <li>HTTP API Server</li>
+                        <li>JSON データ交換</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>フロントエンド</h4>
+                    <ul>
+                        <li>HTML5 + CSS3</li>
+                        <li>Vanilla JavaScript</li>
+                        <li>Fetch API</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>外部連携</h4>
+                    <ul>
+                        <li>Google Sheets API</li>
+                        <li>OpenAI API</li>
+                        <li>Claude API</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>デプロイ</h4>
+                    <ul>
+                        <li>GitHub Actions</li>
+                        <li>SSH 自動デプロイ</li>
+                        <li>HTTPS対応</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; opacity: 0.8;">
+            <p>🚀 <strong>GitHub Actions 自動デプロイ</strong></p>
+            <p>📅 最終更新: 2025年7月6日 06:45 JST</p>
+            <p>🔗 <a href="https://github.com/horiken1977/tag-generator" style="color: #74c0fc;">GitHubリポジトリ</a></p>
+        </div>
+    </div>
+</body>
+</html>
