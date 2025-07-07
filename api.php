@@ -942,54 +942,40 @@ try {
                 
                 error_log("=== TESTING SIMPLE PROCESSING ===");
                 
-                // データがある場合のみ処理
+                // データがある場合のみ処理（成功した元のロジック）
                 if (!empty($videoData)) {
                     error_log("Processing " . count($videoData) . " items");
                     
-                    // 安全な小バッチ処理（最大5件まで）
-                    $maxItems = min(count($videoData), 5);
+                    // 最初の1件だけを安全に処理（成功実績）
+                    $firstItem = $videoData[0];
+                    error_log("First item title: " . ($firstItem['title'] ?? 'no title'));
                     
-                    for ($i = 0; $i < $maxItems; $i++) {
-                        $item = $videoData[$i];
-                        error_log("Processing item $i: " . ($item['title'] ?? 'no title'));
+                    try {
+                        error_log("=== TESTING SIMULATION TAGS ===");
+                        $testTags = generateSimulatedTags([
+                            'title' => substr($firstItem['title'] ?? '', 0, 20),
+                            'skill' => substr($firstItem['skill'] ?? '', 0, 15)
+                        ]);
+                        error_log("Simulation tags generated: " . count($testTags));
                         
-                        try {
-                            // 安全なデータ準備
-                            $safeData = [
-                                'title' => substr($item['title'] ?? '', 0, 30),
-                                'skill' => substr($item['skill'] ?? '', 0, 20),
-                                'description' => substr($item['description'] ?? '', 0, 50)
-                            ];
-                            
-                            error_log("Generating tags for item $i");
-                            $tags = generateSimulatedTags($safeData);
-                            error_log("Generated " . count($tags) . " tags for item $i");
-                            
-                            $results[] = [
-                                'title' => $item['title'] ?? 'Unknown',
-                                'generated_tags' => $tags,
-                                'confidence' => 0.8,
-                                'processing_type' => 'micro_batch',
-                                'batch_index' => $i
-                            ];
-                            
-                        } catch (Exception $e) {
-                            error_log("Exception processing item $i: " . $e->getMessage());
-                            $results[] = [
-                                'title' => $item['title'] ?? 'Error item',
-                                'generated_tags' => ['エラー', 'ビジネススキル'],
-                                'confidence' => 0.3,
-                                'processing_type' => 'error_fallback',
-                                'batch_index' => $i
-                            ];
-                        }
+                        $results[] = [
+                            'title' => $firstItem['title'] ?? 'Unknown',
+                            'generated_tags' => $testTags,
+                            'confidence' => 0.8,
+                            'processing_type' => 'simple_test'
+                        ];
                         
-                        // 各アイテム間に小休止
-                        usleep(10000); // 0.01秒
+                        error_log("Result created successfully");
+                        
+                    } catch (Exception $e) {
+                        error_log("Exception in simple processing: " . $e->getMessage());
+                        $results[] = [
+                            'title' => 'Error occurred',
+                            'generated_tags' => ['エラー'],
+                            'confidence' => 0.1,
+                            'processing_type' => 'error'
+                        ];
                     }
-                    
-                    error_log("Completed processing $maxItems items");
-                    
                 } else {
                     error_log("No data to process");
                     $results[] = [
