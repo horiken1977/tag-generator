@@ -172,6 +172,10 @@
                 <span id="diagnostic-loading" class="loading hidden"></span>
                 診断テスト
             </button>
+            <button class="btn btn-secondary" onclick="testSimpleProcessing()" id="simple-test-btn" style="margin-left: 10px;">
+                <span id="simple-test-loading" class="loading hidden"></span>
+                簡易処理テスト
+            </button>
             
             <div id="connection-status"></div>
             
@@ -407,6 +411,84 @@
             } finally {
                 diagnosticBtn.disabled = false;
                 diagnosticLoading.classList.add('hidden');
+            }
+        }
+        
+        // 簡易処理テスト
+        async function testSimpleProcessing() {
+            const simpleTestBtn = document.getElementById('simple-test-btn');
+            const simpleTestLoading = document.getElementById('simple-test-loading');
+            const statusDiv = document.getElementById('connection-status');
+            
+            console.log('Starting simple processing test...');
+            
+            // UI更新
+            simpleTestBtn.disabled = true;
+            simpleTestLoading.classList.remove('hidden');
+            statusDiv.innerHTML = '<div class="status info">🔄 簡易処理テスト中...</div>';
+            
+            try {
+                // 最小限のテストデータで ai_process をテスト
+                const testData = {
+                    data: [
+                        {
+                            title: "マーケティングテスト",
+                            skill: "マーケティング",
+                            description: "テスト説明文"
+                        }
+                    ],
+                    ai_engine: "openai",
+                    processing_mode: "lightweight",
+                    batch_size: 1,
+                    quality: "fast",
+                    use_real_ai: false
+                };
+                
+                console.log('Calling ai_process with test data:', testData);
+                
+                const result = await callAPI('ai_process', {
+                    method: 'POST',
+                    body: JSON.stringify(testData)
+                });
+                
+                console.log('Simple processing result:', result);
+                
+                // 結果を表示
+                statusDiv.innerHTML = `
+                    <div class="status ${result.success ? 'success' : 'error'}">
+                        <h4>🔄 簡易処理テスト結果</h4>
+                        <div style="text-align: left; margin: 15px 0;">
+                            <strong>処理結果:</strong><br>
+                            • 成功: ${result.success ? '✅' : '❌'}<br>
+                            • 処理件数: ${result.processed_count || 0}件<br>
+                            • 生成タグ数: ${result.total_tags_generated || 0}個<br>
+                            • 処理時間: ${result.processing_time ? (result.processing_time * 1000).toFixed(2) + 'ms' : 'N/A'}<br>
+                            • AIモード: ${result.ai_mode || 'N/A'}<br>
+                            • リクエストサイズ: ${result.request_size || 0}バイト<br>
+                            <br>
+                            <strong>生成されたタグ:</strong><br>
+                            ${result.results && result.results.length > 0 ? 
+                                result.results.map(r => 
+                                    `• ${r.title}: [${r.generated_tags ? r.generated_tags.join(', ') : 'なし'}]`
+                                ).join('<br>') 
+                                : '❌ 結果なし'}
+                        </div>
+                        ${!result.success && result.error ? `<div style="color: #ff6b6b;">エラー: ${result.error}</div>` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Simple processing test failed:', error);
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ❌ 簡易処理テスト失敗<br>
+                        エラー: ${error.message}<br>
+                        <small>詳細はコンソールログを確認してください</small>
+                    </div>
+                `;
+            } finally {
+                simpleTestBtn.disabled = false;
+                simpleTestLoading.classList.add('hidden');
             }
         }
         
