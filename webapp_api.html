@@ -1014,7 +1014,7 @@
             let mimeType = '';
             
             if (format === 'csv') {
-                // CSV形式でダウンロード
+                // CSV形式でダウンロード（Shift-JIS対応）
                 const csvRows = [
                     'タイトル,スキル,生成タグ,信頼度,処理タイプ'
                 ];
@@ -1024,9 +1024,20 @@
                     csvRows.push(`"${result.title}","${result.skill}","${tags}",${result.confidence},"${result.processing_type}"`);
                 });
                 
-                content = csvRows.join('\n');
+                content = csvRows.join('\r\n'); // Windows改行コード
                 filename = `tag_results_client_side_${new Date().toISOString().slice(0,10)}.csv`;
-                mimeType = 'text/csv;charset=utf-8;';
+                
+                // UTF-8 BOM付きでエクセル対応
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM
+                const encoder = new TextEncoder();
+                const uint8Array = encoder.encode(content);
+                const blob = new Blob([bom, uint8Array], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                return;
                 
             } else if (format === 'json') {
                 // JSON形式でダウンロード
