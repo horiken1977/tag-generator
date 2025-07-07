@@ -298,6 +298,10 @@
                     ...options,
                     headers: {
                         'Content-Type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': 'application/json, text/plain, */*',
+                        'Accept-Language': 'ja-JP,ja;q=0.9,en;q=0.8',
+                        'Cache-Control': 'no-cache',
                         ...options.headers
                     }
                 });
@@ -544,6 +548,8 @@
                     // 列マッピング設定を表示
                     if (columnHeaders.length > 0) {
                         setupColumnMapping(columnHeaders);
+                        // 列選択セクションを表示
+                        document.getElementById('column-mapping').classList.remove('hidden');
                         document.getElementById('process-btn').disabled = false;
                     } else {
                         statusDiv.innerHTML += `<div class="status warning">⚠️ 列が検出されませんでした。スプレッドシートの形式を確認してください。</div>`;
@@ -696,25 +702,25 @@
                 statusText.innerHTML = `
                     <div class="status info">
                         🚀 ステップ2/5: マイクロバッチ処理中...<br>
-                        <small>データを小分けして安全に処理中（最大5件ずつ）</small>
+                        <small>WAF対策で超小分けバッチ処理中（3件ずつ、2秒間隔）</small>
                     </div>
                 `;
                 progressBar.style.width = '30%';
                 
-                // 非常に小さなバッチで分割処理 - 修正版
-                const microBatchSize = 5; // 成功実績のあるサイズ
-                const maxTotalItems = Math.min(sheetsData.data.length, 15); // 最大15件に制限
+                // 非常に小さなバッチで分割処理 - WAF回避版
+                const microBatchSize = 3; // WAF対策でさらに小さく
+                const maxTotalItems = Math.min(sheetsData.data.length, 12); // 最大12件に制限
                 const allLightweightResults = [];
                 let totalProcessingTime = 0;
                 
                 for (let i = 0; i < maxTotalItems; i += microBatchSize) {
                     const microBatch = sheetsData.data.slice(i, Math.min(i + microBatchSize, maxTotalItems));
                     
-                    // データサイズを最小化（成功実績に基づく）
+                    // データサイズを最小化（WAF対策強化版）
                     const optimizedBatch = microBatch.map(item => ({
-                        title: (item.title || '').substring(0, 30),      // 30文字に制限
-                        skill: (item.skill || '').substring(0, 20),      // 20文字に制限
-                        description: (item.description || '').substring(0, 50) // 50文字に制限
+                        title: (item.title || '').substring(0, 25),      // 25文字に制限
+                        skill: (item.skill || '').substring(0, 15),      // 15文字に制限
+                        description: (item.description || '').substring(0, 35) // 35文字に制限
                     }));
                     
                     const requestData = {
@@ -729,8 +735,8 @@
                     const requestSize = JSON.stringify(requestData).length;
                     console.log(`Micro-batch ${Math.floor(i/microBatchSize) + 1} size:`, requestSize, 'bytes');
                     
-                    // 成功実績に基づいたサイズ制限
-                    if (requestSize > 8 * 1024) { // 8KB制限
+                    // WAF対策の厳しいサイズ制限
+                    if (requestSize > 4 * 1024) { // 4KB制限
                         console.warn('Micro-batch still too large, skipping...');
                         continue;
                     }
@@ -753,8 +759,8 @@
                             totalProcessingTime += microResponse.processing_time || 0;
                         }
                         
-                        // バッチ間の休憩（成功実績に基づく）
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // バッチ間の休憩（WAF対策強化版）
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                         
                     } catch (batchError) {
                         console.warn(`Micro-batch ${Math.floor(i/microBatchSize) + 1} failed:`, batchError.message);
@@ -784,7 +790,7 @@
                 progressBar.style.width = '50%';
                 
                 // 重要動画の選択（タグ数が多い動画を上位から選択）
-                const maxDetailedItems = Math.min(lightweightData.results.length, 15); // 最大15件に制限
+                const maxDetailedItems = Math.min(lightweightData.results.length, 10); // WAF対策で最大10件に制限
                 const sortedVideos = lightweightData.results
                     .map((result, index) => ({ ...result, originalIndex: index }))
                     .sort((a, b) => b.generated_tags.length - a.generated_tags.length)
@@ -1316,12 +1322,22 @@
         
         async function previewData() {
             const statusDiv = document.getElementById('connection-status');
+            const url = document.getElementById('sheets-url').value;
+            
+            if (!url) {
+                statusDiv.innerHTML = '<div class="status warning">URLを入力してください</div>';
+                return;
+            }
+            
             statusDiv.innerHTML = '<div class="status info">データプレビューを読み込み中...</div>';
             
             try {
                 const response = await callAPI('sheets_data', {
                     method: 'POST',
-                    body: JSON.stringify({preview: true})
+                    body: JSON.stringify({
+                        url: url,
+                        preview: true
+                    })
                 });
                 
                 const data = response;
