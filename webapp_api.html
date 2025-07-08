@@ -96,6 +96,18 @@
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
         }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .btn-warning:disabled {
+            background: #6c757d;
+            color: #fff;
+            cursor: not-allowed;
+        }
         .hidden { display: none; }
         .result-section {
             background: rgba(255,255,255,0.05);
@@ -242,11 +254,12 @@
             <div class="card">
                 <h2>⚙️ 処理設定</h2>
                 <div class="form-group">
-                    <label for="batch-size">バッチサイズ</label>
+                    <label for="batch-size">バッチサイズ（1回の処理件数）</label>
                     <select id="batch-size">
-                        <option value="10">10件</option>
-                        <option value="20" selected>20件 (推奨)</option>
-                        <option value="50">50件</option>
+                        <option value="5">5件（安全）</option>
+                        <option value="10" selected>10件 (推奨)</option>
+                        <option value="15">15件</option>
+                        <option value="20">20件</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -256,6 +269,19 @@
                         <option value="balanced" selected>バランス</option>
                         <option value="high">高品質</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="processing-mode">処理モード</label>
+                    <select id="processing-mode">
+                        <option value="single" selected>単発バッチ（1回のみ）</option>
+                        <option value="continuous">連続バッチ（全件処理）</option>
+                    </select>
+                </div>
+                <div class="form-group" id="batch-info" style="padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; font-size: 14px;">
+                    <strong>💡 バッチ処理について:</strong><br>
+                    • 単発: 選択した件数のみ処理<br>
+                    • 連続: 全データを分割して順次処理<br>
+                    • エラー時も前バッチの結果は保持
                 </div>
             </div>
         </div>
@@ -267,6 +293,17 @@
                 タグ生成開始
             </button>
             <button class="btn btn-secondary" onclick="previewData()">データプレビュー</button>
+            <button class="btn btn-warning" onclick="stopProcessing()" id="stop-btn" disabled style="margin-left: 10px;">
+                処理停止
+            </button>
+            
+            <div id="batch-summary" class="hidden" style="margin-top: 15px; padding: 10px; background: rgba(33,150,243,0.2); border-radius: 5px;">
+                <h4>📊 バッチ処理状況</h4>
+                <div id="batch-info-text">バッチ 0/0 完了</div>
+                <button class="btn btn-secondary" onclick="downloadPartialResults()" id="partial-download-btn" disabled style="margin-top: 10px;">
+                    📥 部分結果をダウンロード
+                </button>
+            </div>
             
             <div id="processing-status" class="hidden">
                 <div class="progress">
@@ -286,6 +323,10 @@
         let isProcessing = false;
         let sheetData = null;
         let columnHeaders = [];
+        let allBatchResults = []; // 全バッチの結果を保存
+        let currentBatch = 0;
+        let totalBatches = 0;
+        let batchSize = 10; // デフォルトバッチサイズ
         
         // APIベースURLの設定（PHP API使用）
         const API_BASE_URL = window.location.protocol + '//' + window.location.hostname + window.location.pathname.replace(/\/[^\/]*$/, '') + '/api.php';
@@ -431,6 +472,293 @@
             const uniqueTags = [...new Set(tags)];
             const finalCount = Math.max(10, Math.min(15, uniqueTags.length));
             return uniqueTags.slice(0, finalCount);
+        }
+        
+        // バッチ処理メイン関数
+        async function processBatches(sheetsData, tagStrategy, processingMode, statusText, progressBar, batchInfoText, partialDownloadBtn) {
+            const maxItems = processingMode === 'single' ? batchSize : sheetsData.data.length;
+            
+            for (let batchStart = 0; batchStart < maxItems && isProcessing; batchStart += batchSize) {
+                currentBatch++;
+                const batchEnd = Math.min(batchStart + batchSize, maxItems);
+                const batchData = sheetsData.data.slice(batchStart, batchEnd);
+                
+                // バッチ情報を更新
+                batchInfoText.textContent = `バッチ ${currentBatch}/${totalBatches} 処理中... (${batchStart + 1}-${batchEnd}件目)`;
+                
+                statusText.innerHTML = `
+                    <div class="status info">
+                        🚀 バッチ ${currentBatch}/${totalBatches}: タグ生成中...<br>
+                        <small>${batchData.length}件を処理中（${batchStart + 1}-${batchEnd}件目）</small>
+                    </div>
+                `;
+                
+                try {
+                    const batchResults = await processSingleBatch(batchData, tagStrategy, currentBatch);
+                    allBatchResults.push(...batchResults);
+                    
+                    // 進捗更新
+                    const overallProgress = (currentBatch / totalBatches) * 80 + 16; // 16%から96%まで
+                    progressBar.style.width = `${overallProgress}%`;
+                    
+                    // バッチ完了情報
+                    batchInfoText.textContent = `バッチ ${currentBatch}/${totalBatches} 完了 (${allBatchResults.length}件処理済み)`;
+                    partialDownloadBtn.disabled = false;
+                    
+                    // 単発モードの場合はここで終了
+                    if (processingMode === 'single') break;
+                    
+                    // 連続モードの場合は次のバッチ前に少し待機
+                    if (batchStart + batchSize < maxItems) {
+                        statusText.innerHTML = `
+                            <div class="status info">
+                                ⏳ 次のバッチまで待機中...<br>
+                                <small>WAF対策のため3秒待機します</small>
+                            </div>
+                        `;
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                    
+                } catch (error) {
+                    console.error(`Batch ${currentBatch} error:`, error);
+                    statusText.innerHTML = `
+                        <div class="status warning">
+                            ⚠️ バッチ ${currentBatch} でエラーが発生しました<br>
+                            <small>エラー: ${error.message}</small><br>
+                            <small>前のバッチの結果は保持されています</small>
+                        </div>
+                    `;
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // エラーが発生してもバッチカウントは進める
+                }
+            }
+            
+            // 最終処理
+            await finalizeBatchProcessing(sheetsData, tagStrategy, statusText, progressBar);
+        }
+        
+        // 単一バッチの処理
+        async function processSingleBatch(batchData, tagStrategy, batchNumber) {
+            const batchResults = [];
+            
+            for (let i = 0; i < batchData.length; i++) {
+                if (!isProcessing) break; // 停止チェック
+                
+                const item = batchData[i];
+                const generatedTags = generateClientSideTags(item, tagStrategy);
+                
+                batchResults.push({
+                    title: item.title,
+                    skill: item.skill,
+                    generated_tags: generatedTags,
+                    confidence: 0.8,
+                    processing_type: 'client_side_batch',
+                    batch_number: batchNumber
+                });
+                
+                // 視覚的な進捗のため500ms待機
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            return batchResults;
+        }
+        
+        // バッチ処理の最終処理
+        async function finalizeBatchProcessing(sheetsData, tagStrategy, statusText, progressBar) {
+            // 統合処理
+            statusText.innerHTML = `
+                <div class="status info">
+                    🎯 最終統合処理中...<br>
+                    <small>全バッチの結果を統合し、タグ頻度を分析中</small>
+                </div>
+            `;
+            progressBar.style.width = '96%';
+            
+            const allTags = allBatchResults.flatMap(result => result.generated_tags || []);
+            const tagFrequency = {};
+            allTags.forEach(tag => {
+                tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
+            });
+            
+            const unifiedData = {
+                success: true,
+                results: [{
+                    unified_tags: Object.keys(tagFrequency).sort((a, b) => tagFrequency[b] - tagFrequency[a]),
+                    tag_frequencies: tagFrequency,
+                    original_count: allTags.length,
+                    unified_count: Object.keys(tagFrequency).length
+                }],
+                processing_mode: 'batch_unified'
+            };
+            
+            // 完了
+            statusText.innerHTML = `
+                <div class="status success">
+                    🎉 バッチ処理完了！<br>
+                    <small>${currentBatch}バッチ / ${allBatchResults.length}件のタグ生成が完了しました</small>
+                </div>
+            `;
+            progressBar.style.width = '100%';
+            
+            // 結果表示
+            setTimeout(() => {
+                const lightweightData = {
+                    success: true,
+                    results: allBatchResults,
+                    processed_count: allBatchResults.length,
+                    total_tags_generated: allTags.length,
+                    processing_time: allBatchResults.length * 0.5,
+                    ai_mode: 'client_side_batch',
+                    processing_mode: 'batch_processing'
+                };
+                
+                displayBatchResults(sheetsData, tagStrategy, lightweightData, unifiedData);
+                document.getElementById('processing-status').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+                
+                // ボタンを元に戻す
+                document.getElementById('process-btn').disabled = false;
+                document.getElementById('stop-btn').disabled = true;
+                document.getElementById('process-btn').innerHTML = `
+                    <span id="process-loading" class="loading hidden"></span>
+                    タグ生成開始
+                `;
+                
+                isProcessing = false;
+            }, 1000);
+        }
+        
+        // 処理停止機能
+        function stopProcessing() {
+            if (isProcessing) {
+                isProcessing = false;
+                document.getElementById('status-text').innerHTML = `
+                    <div class="status warning">
+                        ⏹️ 処理が停止されました<br>
+                        <small>現在までの結果は保持されています</small>
+                    </div>
+                `;
+                document.getElementById('process-btn').disabled = false;
+                document.getElementById('stop-btn').disabled = true;
+                document.getElementById('process-btn').innerHTML = `
+                    <span id="process-loading" class="loading hidden"></span>
+                    タグ生成開始
+                `;
+            }
+        }
+        
+        // 部分結果ダウンロード機能
+        function downloadPartialResults() {
+            if (allBatchResults.length === 0) {
+                alert('ダウンロードできる結果がありません');
+                return;
+            }
+            
+            // 部分結果用のデータを作成
+            const partialData = {
+                lightweightData: {
+                    results: allBatchResults,
+                    processed_count: allBatchResults.length
+                },
+                unifiedData: {
+                    results: [{
+                        unified_tags: [...new Set(allBatchResults.flatMap(r => r.generated_tags))],
+                        tag_frequencies: {}
+                    }]
+                }
+            };
+            
+            // タグ頻度を計算
+            const allTags = allBatchResults.flatMap(result => result.generated_tags || []);
+            allTags.forEach(tag => {
+                partialData.unifiedData.results[0].tag_frequencies[tag] = 
+                    (partialData.unifiedData.results[0].tag_frequencies[tag] || 0) + 1;
+            });
+            
+            // CSV生成
+            const csvRows = ['タイトル,スキル,生成タグ（部分結果）,信頼度,処理タイプ,バッチ番号'];
+            partialData.lightweightData.results.forEach(result => {
+                const tags = result.generated_tags.join('; ');
+                csvRows.push(`"${result.title}","${result.skill}","${tags}",${result.confidence},"${result.processing_type}",${result.batch_number}`);
+            });
+            
+            const content = csvRows.join('\r\n');
+            const filename = `tag_results_partial_${currentBatch}batches_${new Date().toISOString().slice(0,10)}.csv`;
+            
+            // ダウンロード実行
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const encoder = new TextEncoder();
+            const uint8Array = encoder.encode(content);
+            const blob = new Blob([bom, uint8Array], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+        
+        // バッチ結果表示用の新しい関数
+        function displayBatchResults(sheetsData, tagStrategy, lightweightData, unifiedData) {
+            // 結果データを保存（ダウンロード用）
+            window.resultsData = {
+                sheetsData: sheetsData,
+                tagStrategy: tagStrategy,
+                lightweightData: lightweightData,
+                unifiedData: unifiedData
+            };
+            
+            const unifiedResult = unifiedData.results[0];
+            
+            document.getElementById('result-content').innerHTML = `
+                <div class="status success">
+                    <h3>🎉 バッチ処理完了</h3>
+                    <p>• 処理動画数: ${lightweightData.processed_count}件（${currentBatch}バッチ）</p>
+                    <p>• バッチサイズ: ${batchSize}件ずつ</p>
+                    <p>• タグ生成数: 1件あたり10-15個の詳細タグ</p>
+                    <p>• 統合処理: ${unifiedResult.original_count}個 → ${unifiedResult.unified_count}個に最適化</p>
+                    <p>• 処理方式: クライアントサイドバッチ処理（WAF完全回避）</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                    <div style="background: rgba(76,175,80,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🔢 バッチ処理実績</h5>
+                        <p>実行バッチ数: ${currentBatch}個</p>
+                        <p>平均処理時間: ${(lightweightData.processing_time / currentBatch).toFixed(1)}秒/バッチ</p>
+                    </div>
+                    <div style="background: rgba(33,150,243,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🔍 タグ生成結果</h5>
+                        <p>総タグ数: ${unifiedResult.original_count}個</p>
+                        <p>平均タグ数: ${(unifiedResult.original_count / lightweightData.processed_count).toFixed(1)}個/動画</p>
+                    </div>
+                    <div style="background: rgba(156,39,176,0.2); padding: 15px; border-radius: 8px;">
+                        <h5>🔧 重複除去結果</h5>
+                        <p>ユニークタグ数: ${unifiedResult.unified_count}個</p>
+                        <p>重複削減率: ${((1 - unifiedResult.unified_count / unifiedResult.original_count) * 100).toFixed(1)}%</p>
+                    </div>
+                </div>
+                
+                <h4>🏆 最終統合タグ（上位30個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${unifiedResult.unified_tags.slice(0, 30).join(', ')}
+                </div>
+                
+                <h4>📊 タグ出現頻度（上位15個）</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${Object.entries(unifiedResult.tag_frequencies).slice(0, 15).map(([tag, freq]) => `
+                        <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                            <span>${tag}</span>
+                            <span>${freq}回 (${((freq / lightweightData.processed_count) * 100).toFixed(1)}%)</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="downloadClientSideResults('csv')">📥 全結果をCSVでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadClientSideResults('json')">📥 全データをJSONでダウンロード</button>
+                    <button class="btn btn-secondary" onclick="downloadClientSideResults('tags')">📥 統合タグのみダウンロード</button>
+                </div>
+            `;
         }
         
         // API呼び出しのヘルパー関数
@@ -790,6 +1118,15 @@
                 return;
             }
             
+            // バッチ処理設定を取得
+            batchSize = parseInt(document.getElementById('batch-size').value) || 10;
+            const processingMode = document.getElementById('processing-mode').value || 'single';
+            
+            // 初期化
+            allBatchResults = [];
+            currentBatch = 0;
+            totalBatches = 0;
+            
             isProcessing = true;
             
             // DOM要素を安全に取得
@@ -798,6 +1135,10 @@
             const statusText = document.getElementById('status-text');
             const resultsDiv = document.getElementById('results');
             const processBtn = document.getElementById('process-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const batchSummaryDiv = document.getElementById('batch-summary');
+            const batchInfoText = document.getElementById('batch-info-text');
+            const partialDownloadBtn = document.getElementById('partial-download-btn');
             const loading = document.getElementById('process-loading');
             
             // 要素の存在確認
@@ -809,9 +1150,10 @@
             
             // UI状態を更新
             processBtn.disabled = true;
+            stopBtn.disabled = false;
             processBtn.innerHTML = `
                 <span class="loading"></span>
-                段階的処理中...
+                バッチ処理中...
             `;
             
             if (loading) {
@@ -820,6 +1162,7 @@
             
             statusDiv.classList.remove('hidden');
             resultsDiv.classList.add('hidden');
+            batchSummaryDiv.classList.remove('hidden');
             
             try {
                 // Stage 1: Get data from sheets
@@ -841,11 +1184,20 @@
                 
                 const sheetsData = sheetsResponse;
                 
+                // バッチ数を計算
+                if (processingMode === 'single') {
+                    totalBatches = 1;
+                } else {
+                    totalBatches = Math.ceil(sheetsData.data.length / batchSize);
+                }
+                
+                batchInfoText.textContent = `バッチ 0/${totalBatches} 完了 (総${sheetsData.data.length}件)`;
+                
                 // Stage 2: Client-side tag strategy (WAF回避のため完全ローカル処理)
                 statusText.innerHTML = `
                     <div class="status info">
                         🔍 ステップ2/6: クライアントサイド事前分析中...<br>
-                        <small>WAF回避のためローカルでタグキーワードを決定</small>
+                        <small>バッチ処理設定: ${processingMode === 'single' ? '単発' : '連続'} / ${batchSize}件ずつ</small>
                     </div>
                 `;
                 progressBar.style.width = '16%';
@@ -856,104 +1208,8 @@
                 // 1秒待機（ユーザーに処理感を与える）
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Stage 3: Client-side tag generation (完全WAF回避)
-                statusText.innerHTML = `
-                    <div class="status info">
-                        🚀 ステップ3/6: クライアントサイドタグ生成中...<br>
-                        <small>WAF完全回避のためローカル処理（お試し10件）</small>
-                    </div>
-                `;
-                progressBar.style.width = '40%';
-                
-                // 完全にクライアントサイドで処理
-                const maxTotalItems = Math.min(sheetsData.data.length, 10);
-                const allLightweightResults = [];
-                
-                for (let i = 0; i < maxTotalItems; i++) {
-                    const item = sheetsData.data[i];
-                    
-                    statusText.innerHTML = `
-                        <div class="status info">
-                            🚀 ステップ3/6: クライアントサイドタグ生成中...<br>
-                            <small>アイテム ${i + 1}/${maxTotalItems} を処理中（ローカル処理）</small>
-                        </div>
-                    `;
-                    
-                    // クライアントサイドでタグ生成
-                    const generatedTags = generateClientSideTags(item, tagStrategy);
-                    
-                    allLightweightResults.push({
-                        title: item.title,
-                        skill: item.skill,
-                        generated_tags: generatedTags,
-                        confidence: 0.8,
-                        processing_type: 'client_side'
-                    });
-                    
-                    // 視覚的な進捗のため500ms待機
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-                
-                // 結果をまとめる
-                const lightweightData = {
-                    success: true,
-                    results: allLightweightResults,
-                    processed_count: allLightweightResults.length,
-                    total_tags_generated: allLightweightResults.reduce((sum, result) => sum + (result.generated_tags?.length || 0), 0),
-                    processing_time: maxTotalItems * 0.5, // シミュレーション時間
-                    ai_mode: 'client_side', // クライアントサイドモード
-                    processing_mode: 'local_rules'
-                };
-                
-                // Stage 4: Basic tag analysis (簡単な統合処理のみ)
-                statusText.innerHTML = `
-                    <div class="status info">
-                        🎯 ステップ4/6: タグ統合分析中...<br>
-                        <small>生成されたタグの基本統合と頻度分析</small>
-                    </div>
-                `;
-                progressBar.style.width = '80%';
-                
-                // 軽量な統合処理のみ実行（詳細処理とAPI呼び出しをスキップ）
-                const allTags = lightweightData.results.flatMap(result => result.generated_tags || []);
-                const tagFrequency = {};
-                allTags.forEach(tag => {
-                    tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
-                });
-                
-                const unifiedData = {
-                    success: true,
-                    results: [{
-                        unified_tags: Object.keys(tagFrequency).sort((a, b) => tagFrequency[b] - tagFrequency[a]),
-                        tag_frequencies: tagFrequency,
-                        original_count: allTags.length,
-                        unified_count: Object.keys(tagFrequency).length
-                    }],
-                    processing_mode: 'simple_unified'
-                };
-                
-                // Complete
-                statusText.innerHTML = `
-                    <div class="status success">
-                        🎉 WAF対策処理完了！<br>
-                        <small>事前分析→1件ずつ処理→統合の6ステップが完了しました</small>
-                    </div>
-                `;
-                progressBar.style.width = '100%';
-                
-                // Show results
-                setTimeout(() => {
-                    displaySimpleResults(sheetsData, tagStrategy, lightweightData, unifiedData);
-                    statusDiv.classList.add('hidden');
-                    resultsDiv.classList.remove('hidden');
-                    
-                    // ボタンを元に戻す
-                    processBtn.disabled = false;
-                    processBtn.innerHTML = `
-                        <span id="process-loading" class="loading hidden"></span>
-                        タグ生成開始
-                    `;
-                }, 1000);
+                // バッチ処理開始
+                await processBatches(sheetsData, tagStrategy, processingMode, statusText, progressBar, batchInfoText, partialDownloadBtn);
                 
             } catch (error) {
                 console.error('Processing error:', error);
@@ -991,14 +1247,26 @@
                 }, 10000);
             } finally {
                 isProcessing = false;
-                processBtn.disabled = false;
-                processBtn.innerHTML = `
-                    <span id="process-loading" class="loading hidden"></span>
-                    タグ生成開始
-                `;
                 
-                if (loading) {
-                    loading.classList.add('hidden');
+                // DOM要素の安全な操作
+                try {
+                    if (processBtn) {
+                        processBtn.disabled = false;
+                        processBtn.innerHTML = `
+                            <span id="process-loading" class="loading hidden"></span>
+                            タグ生成開始
+                        `;
+                    }
+                    
+                    if (stopBtn) {
+                        stopBtn.disabled = true;
+                    }
+                    
+                    if (loading) {
+                        loading.classList.add('hidden');
+                    }
+                } catch (domError) {
+                    console.error('DOM操作エラー:', domError);
                 }
             }
         }
