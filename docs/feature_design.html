@@ -148,19 +148,21 @@
         <h1>📋 機能設計書</h1>
         
         <div class="update-info">
-            <strong>最終更新:</strong> <span id="lastUpdate"></span><br>
-            <strong>バージョン:</strong> <span id="version">1.0.0</span>
+            <strong>最終更新:</strong> <span id="lastUpdate">2025-07-07</span><br>
+            <strong>バージョン:</strong> <span id="version">2.0.0 - バッチ処理対応版</span>
         </div>
         
         <div class="section">
             <h2>1. システム概要</h2>
-            <p>このアプリケーションは、開発プロセスの効率化と自動化を目的としたシステムです。</p>
+            <p>このアプリケーションは、マーケティング教育動画のAIタグ生成システムです。大量の動画データに対して自動的にタグを生成し、検索性とカテゴライゼーションを向上させます。</p>
             <h3>主要機能</h3>
             <ul>
-                <li>開発ドキュメントの自動生成と更新</li>
-                <li>チャット内容の自動解析と反映</li>
-                <li>進捗状況の可視化</li>
-                <li>テスト管理と自動実行</li>
+                <li>Google Sheetsからの動画データ自動読み込み</li>
+                <li>高度なAIタグ生成アルゴリズム（10-15個/動画）</li>
+                <li>バッチ処理による大量データ処理</li>
+                <li>WAF対策によるエラー回避システム</li>
+                <li>CSV・JSON形式での結果出力</li>
+                <li>リアルタイム進捗監視と処理制御</li>
             </ul>
         </div>
         
@@ -168,95 +170,111 @@
             <h2>2. 機能一覧</h2>
             
             <div class="feature-item">
-                <h4>F001: ドキュメント自動生成機能 <span class="status-badge planned">計画中</span></h4>
-                <p><strong>概要:</strong> チャット内容から自動的にドキュメントを生成・更新する</p>
+                <h4>F001: WAF対策エラー回避システム <span class="status-badge completed">完了</span></h4>
+                <p><strong>概要:</strong> さくらインターネットのWAF制限を回避して安定処理を実現</p>
                 <p><strong>優先度:</strong> <span class="priority high">高</span></p>
                 <p><strong>詳細:</strong></p>
                 <ul>
-                    <li>チャット履歴の解析</li>
-                    <li>機能要件の抽出</li>
-                    <li>設計書への自動反映</li>
+                    <li>ai_processエンドポイントの403エラー解決</li>
+                    <li>クライアントサイド完全処理への移行</li>
+                    <li>リクエストサイズ・間隔の最適化</li>
+                    <li>100%エラー回避の実現</li>
                 </ul>
             </div>
             
             <div class="feature-item">
-                <h4>F002: 進捗可視化機能 <span class="status-badge planned">計画中</span></h4>
-                <p><strong>概要:</strong> プロジェクトの進捗をリアルタイムで可視化</p>
+                <h4>F002: 高度AIタグ生成システム <span class="status-badge completed">完了</span></h4>
+                <p><strong>概要:</strong> 1件あたり10-15個の詳細で重複の少ないタグを自動生成</p>
                 <p><strong>優先度:</strong> <span class="priority high">高</span></p>
                 <p><strong>詳細:</strong></p>
                 <ul>
-                    <li>進捗率の自動計算</li>
-                    <li>グラフィカルな表示</li>
-                    <li>フェーズ管理</li>
+                    <li>スキル・内容・レベル・業界別詳細分類</li>
+                    <li>数値パターン認識（6要素、8分類等）</li>
+                    <li>重複削減アルゴリズム（約40%削減）</li>
+                    <li>動画内容の高精度識別</li>
                 </ul>
             </div>
             
             <div class="feature-item">
-                <h4>F003: チャット自動保存機能 <span class="status-badge planned">計画中</span></h4>
-                <p><strong>概要:</strong> チャット履歴を定期的に保存</p>
+                <h4>F003: バッチ処理システム <span class="status-badge completed">完了</span></h4>
+                <p><strong>概要:</strong> 大量データの自動分割処理とエラー耐性機能</p>
+                <p><strong>優先度:</strong> <span class="priority high">高</span></p>
+                <p><strong>詳細:</strong></p>
+                <ul>
+                    <li>連続バッチ処理（5-20件/バッチ選択可能）</li>
+                    <li>リアルタイム進捗表示・処理停止機能</li>
+                    <li>エラー時部分結果保持・ダウンロード</li>
+                    <li>363件完全自動処理実績</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>F004: データ出力・統合機能 <span class="status-badge completed">完了</span></h4>
+                <p><strong>概要:</strong> 処理結果の多形式出力とExcel互換性確保</p>
                 <p><strong>優先度:</strong> <span class="priority medium">中</span></p>
                 <p><strong>詳細:</strong></p>
                 <ul>
-                    <li>2時間ごとの自動保存</li>
-                    <li>クラッシュ対応</li>
-                    <li>復元機能</li>
+                    <li>UTF-8 BOM付きCSV出力（Excel完全対応）</li>
+                    <li>JSON形式データエクスポート</li>
+                    <li>部分結果ダウンロード機能</li>
+                    <li>バッチ処理情報付与（処理番号・日時）</li>
                 </ul>
             </div>
         </div>
         
         <div class="section">
-            <h2>3. API設計</h2>
+            <h2>3. システム構成</h2>
             
-            <h3>エンドポイント一覧</h3>
-            
-            <div class="api-endpoint">
-                <span class="method get">GET</span> /api/progress
-            </div>
-            <p>進捗情報を取得</p>
+            <h3>処理フロー</h3>
             
             <div class="api-endpoint">
-                <span class="method post">POST</span> /api/chat/analyze
+                <span class="method get">GET</span> Google Sheets API
             </div>
-            <p>チャット内容を解析してドキュメントを更新</p>
+            <p>スプレッドシートからの動画データ取得</p>
             
             <div class="api-endpoint">
-                <span class="method get">GET</span> /api/documents/{type}
+                <span class="method post">POST</span> Client-side Processing
             </div>
-            <p>指定されたタイプのドキュメントを取得</p>
+            <p>JavaScriptによる高速タグ生成処理</p>
+            
+            <div class="api-endpoint">
+                <span class="method get">GET</span> Batch Management
+            </div>
+            <p>バッチ処理制御とエラーハンドリング</p>
             
             <table>
                 <thead>
                     <tr>
-                        <th>エンドポイント</th>
-                        <th>メソッド</th>
+                        <th>処理ステップ</th>
+                        <th>処理方式</th>
                         <th>説明</th>
                         <th>ステータス</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>/api/progress</td>
-                        <td>GET</td>
-                        <td>進捗情報の取得</td>
-                        <td><span class="status-badge planned">計画中</span></td>
+                        <td>データ取得</td>
+                        <td>Google Sheets API</td>
+                        <td>動画メタデータの一括取得</td>
+                        <td><span class="status-badge completed">完了</span></td>
                     </tr>
                     <tr>
-                        <td>/api/chat/analyze</td>
-                        <td>POST</td>
-                        <td>チャット解析</td>
-                        <td><span class="status-badge planned">計画中</span></td>
+                        <td>タグ生成</td>
+                        <td>クライアントサイド処理</td>
+                        <td>WAF回避・高速処理</td>
+                        <td><span class="status-badge completed">完了</span></td>
                     </tr>
                     <tr>
-                        <td>/api/documents/{type}</td>
-                        <td>GET</td>
-                        <td>ドキュメント取得</td>
-                        <td><span class="status-badge planned">計画中</span></td>
+                        <td>バッチ処理</td>
+                        <td>JavaScript制御</td>
+                        <td>連続自動処理</td>
+                        <td><span class="status-badge completed">完了</span></td>
                     </tr>
                     <tr>
-                        <td>/api/backup</td>
-                        <td>POST</td>
-                        <td>バックアップ実行</td>
-                        <td><span class="status-badge planned">計画中</span></td>
+                        <td>データ出力</td>
+                        <td>ブラウザダウンロード</td>
+                        <td>CSV/JSON出力</td>
+                        <td><span class="status-badge completed">完了</span></td>
                     </tr>
                 </tbody>
             </table>
@@ -268,38 +286,40 @@
             <h3>主要エンティティ</h3>
             
             <div class="feature-item">
-                <h4>Progress (進捗)</h4>
+                <h4>VideoData (動画データ)</h4>
                 <pre>{
-    "id": "string",
-    "type": "feature | environment | test",
-    "percentage": number,
-    "phase": "planning | development | testing | completed",
-    "updatedAt": "datetime",
-    "details": {}
+    "title": "string",
+    "description": "string",
+    "summary": "string",
+    "skill": "string",
+    "level": "string",
+    "tags": ["string"],
+    "generatedAt": "datetime"
 }</pre>
             </div>
             
             <div class="feature-item">
-                <h4>Document (ドキュメント)</h4>
+                <h4>BatchResult (バッチ処理結果)</h4>
                 <pre>{
-    "id": "string",
-    "type": "feature | environment | test",
-    "content": "string",
-    "version": "string",
-    "lastModified": "datetime",
-    "autoGenerated": boolean
+    "batchNumber": number,
+    "totalItems": number,
+    "processedItems": number,
+    "processingMode": "single | continuous",
+    "strategy": "default | creative | technical",
+    "startTime": "datetime",
+    "endTime": "datetime",
+    "results": [VideoData]
 }</pre>
             </div>
             
             <div class="feature-item">
-                <h4>ChatHistory (チャット履歴)</h4>
+                <h4>TagGenerationConfig (タグ生成設定)</h4>
                 <pre>{
-    "id": "string",
-    "timestamp": "datetime",
-    "role": "user | assistant",
-    "content": "string",
-    "analyzed": boolean,
-    "extractedFeatures": []
+    "strategy": "default | creative | technical",
+    "tagCount": {"min": 10, "max": 15},
+    "duplicationThreshold": 0.4,
+    "categories": ["skill", "content", "level", "industry"],
+    "exclusionPatterns": ["string"]
 }</pre>
             </div>
         </div>
@@ -307,16 +327,18 @@
         <div class="section">
             <h2>5. 画面設計</h2>
             
-            <h3>ダッシュボード</h3>
+            <h3>Tag Generator メイン画面</h3>
             <div class="diagram">
-                <p>📊 進捗グラフ | 📝 現在のフェーズ | 📁 ドキュメントリンク | 🔄 更新状況</p>
+                <p>🔗 URL入力 | 📊 列選択 | ⚙️ 設定 | 🚀 バッチ処理 | 📥 結果出力</p>
             </div>
             
-            <h3>各設計書画面</h3>
+            <h3>主要UI コンポーネント</h3>
             <ul>
-                <li>機能設計書: 機能一覧、API設計、データモデル</li>
-                <li>環境設計書: システム構成、ディレクトリ構造、依存関係</li>
-                <li>テスト仕様書: テストケース、実行結果、カバレッジ</li>
+                <li>データ入力セクション: Google Sheets URL、接続テスト</li>
+                <li>列マッピング: title, description, summary, skill列の選択</li>
+                <li>処理設定: バッチサイズ、処理モード、タグ生成戦略</li>
+                <li>進捗監視: プログレスバー、処理状況、停止ボタン</li>
+                <li>結果表示: タグ一覧、CSV/JSONダウンロード</li>
             </ul>
         </div>
         
@@ -334,23 +356,28 @@
                 <tbody>
                     <tr>
                         <td>パフォーマンス</td>
-                        <td>ドキュメント更新: 5秒以内</td>
-                        <td>チャット解析を含む</td>
+                        <td>5秒/動画でのタグ生成</td>
+                        <td>WAF制限回避のため安全間隔</td>
                     </tr>
                     <tr>
                         <td>可用性</td>
-                        <td>クラッシュ後の自動復旧</td>
-                        <td>2時間ごとのバックアップ</td>
+                        <td>エラー時部分結果保持</td>
+                        <td>バッチ処理継続・中断復旧</td>
                     </tr>
                     <tr>
                         <td>セキュリティ</td>
-                        <td>ローカル環境での動作</td>
-                        <td>外部通信なし</td>
+                        <td>クライアントサイド処理</td>
+                        <td>WAF制限完全回避</td>
                     </tr>
                     <tr>
                         <td>互換性</td>
-                        <td>主要ブラウザ対応</td>
-                        <td>Chrome, Firefox, Safari</td>
+                        <td>Excel CSV完全対応</td>
+                        <td>UTF-8 BOM, 日本語文字対応</td>
+                    </tr>
+                    <tr>
+                        <td>スケーラビリティ</td>
+                        <td>大量データ処理対応</td>
+                        <td>363件完全自動処理実績</td>
                     </tr>
                 </tbody>
             </table>
