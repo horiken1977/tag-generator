@@ -1,47 +1,20 @@
-#!/bin/bash
-# Tag Generator API Server Startup Script
+#\!/bin/bash
+# 本番環境でAPIサーバーを起動するスクリプト
 
-DEPLOY_DIR="/home/mokumoku/www/tags"
-LOG_DIR="$DEPLOY_DIR/logs"
-PID_FILE="$DEPLOY_DIR/api_server.pid"
+# プロセスの確認
+echo "Checking for existing API server process..."
+ps aux | grep "api_server_v2.py" | grep -v grep
 
-# Create logs directory if not exists
-mkdir -p "$LOG_DIR"
+# 既存プロセスを停止
+pkill -f "api_server_v2.py" 2>/dev/null
 
-# Stop existing server if running
-if [ -f "$PID_FILE" ]; then
-    OLD_PID=$(cat "$PID_FILE")
-    if ps -p "$OLD_PID" > /dev/null 2>&1; then
-        echo "Stopping existing API server (PID: $OLD_PID)..."
-        kill "$OLD_PID"
-        sleep 2
-    fi
-fi
+# APIサーバーを起動
+echo "Starting API server on port 8080..."
+nohup python3 api_server_v2.py > api_server.log 2>&1 &
 
-# Update index.html to use the new version
-if [ -f "$DEPLOY_DIR/index_final.html" ]; then
-    cp "$DEPLOY_DIR/index_final.html" "$DEPLOY_DIR/index.html"
-    echo "Updated index.html"
-fi
+echo "API server started. PID: $\!"
+echo "Log file: api_server.log"
 
-# Start the API server with AI integration
-cd "$DEPLOY_DIR"
-echo "Starting Tag Generator API Server v2..."
-nohup python3 api_server_v2.py > "$LOG_DIR/api_server.log" 2>&1 &
-NEW_PID=$!
-echo $NEW_PID > "$PID_FILE"
-
-# Wait and check if server started successfully
-sleep 3
-if ps -p "$NEW_PID" > /dev/null 2>&1; then
-    echo "✅ API Server started successfully (PID: $NEW_PID)"
-    echo "Server log: $LOG_DIR/api_server.log"
-    
-    # Test API status
-    curl -s http://localhost:8080/api/status | head -10
-else
-    echo "❌ Failed to start API Server"
-    echo "Check log file: $LOG_DIR/api_server.log"
-    tail -20 "$LOG_DIR/api_server.log"
-    exit 1
-fi
+# 起動確認
+sleep 2
+curl -s http://localhost:8080/api/status || echo "API server not responding yet"

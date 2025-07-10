@@ -291,8 +291,7 @@
         function getApiUrl(endpoint) {
             if (IS_PRODUCTION) {
                 // 本番環境ではPHPプロキシを使用
-                // 一時的にデバッグ版を使用
-                return `api_proxy_debug.php?path=${encodeURIComponent(endpoint)}`;
+                return `api_proxy.php?path=${encodeURIComponent(endpoint)}`;
             } else {
                 // 開発環境では直接APIサーバーにアクセス
                 return endpoint;
@@ -370,7 +369,10 @@
             document.getElementById('stage1Btn').disabled = true;
 
             try {
-                const response = await fetch(getApiUrl('/api/ai/stage1'), {
+                // 本番環境では直接PHPスクリプトを使用
+                const url = IS_PRODUCTION ? 'api_stage1_direct.php' : getApiUrl('/api/ai/stage1');
+                
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: currentData })
