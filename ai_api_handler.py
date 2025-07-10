@@ -33,6 +33,10 @@ class AIAPIHandler:
     
     def generate_tags_prompt(self, video_data):
         """Generate prompt for tag generation"""
+        # Expand transcript limit for better context
+        transcript = video_data.get('transcript', '')
+        transcript_excerpt = transcript[:1500] if transcript else ''  # Increased from 500 to 1500
+        
         return f"""
 以下のマーケティング教育動画の情報から、検索性の高いタグを15〜20個生成してください。
 タグは日本語で、具体的かつ実用的なものにしてください。
@@ -41,7 +45,7 @@ class AIAPIHandler:
 スキル名: {video_data.get('skill', '')}
 説明文: {video_data.get('description', '')}
 要約: {video_data.get('summary', '')}
-文字起こし（抜粋）: {video_data.get('transcript', '')[:500]}
+文字起こし（重要）: {transcript_excerpt}
 
 タグ生成の基準:
 1. 動画の主要なトピックとスキル
@@ -49,6 +53,11 @@ class AIAPIHandler:
 3. 解決する課題や目的
 4. 使用されるツールや手法
 5. レベル（初級、中級、上級）
+6. 文字起こし内容から読み取れる具体的な手法やポイント
+7. 実際に話されている事例やケーススタディ
+
+重要: 文字起こし内容を十分に分析し、動画固有の内容を反映したタグを生成してください。
+同じタイトルでも文字起こし内容が異なれば、異なるタグを生成する必要があります。
 
 タグのみをカンマ区切りで出力してください。
 """
@@ -185,22 +194,71 @@ class AIAPIHandler:
         tags = []
         title = video_data.get('title', '').lower()
         skill = video_data.get('skill', '').lower()
+        transcript = video_data.get('transcript', '').lower()
+        description = video_data.get('description', '').lower()
+        summary = video_data.get('summary', '').lower()
         
-        # Basic keyword extraction
+        # Combine all content for comprehensive analysis
+        all_content = f"{title} {skill} {description} {summary} {transcript}".lower()
+        
+        # Enhanced keyword extraction with transcript analysis
         keywords = {
             'マーケティング': ['マーケティング', 'デジタルマーケティング', 'マーケティング戦略'],
             'プレゼン': ['プレゼンテーション', 'プレゼンスキル', '発表技法'],
             'リーダー': ['リーダーシップ', 'マネジメント', 'チームリーダー'],
             'コミュニケーション': ['コミュニケーション', '対人スキル', 'ビジネスコミュニケーション'],
             'データ': ['データ分析', 'データ活用', 'ビジネス分析'],
-            'デジタル': ['デジタル化', 'DX', 'デジタルトランスフォーメーション']
+            'デジタル': ['デジタル化', 'DX', 'デジタルトランスフォーメーション'],
+            'セールス': ['営業', 'セールス', '販売', '営業戦略'],
+            '戦略': ['戦略立案', '企画', 'プランニング', '戦略思考'],
+            '効率': ['効率化', '生産性向上', '時間管理', 'パフォーマンス'],
+            '問題': ['問題解決', '課題解決', 'トラブルシューティング'],
+            '顧客': ['顧客満足', 'CS', '顧客体験', 'CX', '顧客対応'],
+            '品質': ['品質管理', 'QC', '改善', 'カイゼン']
         }
         
+        # Apply keyword matching to all content
         for key, values in keywords.items():
-            if key in title or key in skill:
+            if key in all_content:
                 tags.extend(values)
         
-        # Add skill-based tags
+        # Transcript-specific analysis for detailed content
+        if transcript:
+            # Extract specific business concepts from transcript
+            transcript_keywords = {
+                '売上': ['売上向上', '収益改善', '業績向上'],
+                '収益': ['収益改善', '利益向上', '売上向上'],
+                '改善': ['業務改善', 'プロセス改善', '継続改善'],
+                '分析': ['分析手法', 'データドリブン', '定量分析', '分析力'],
+                '企画': ['企画立案', '企画力', 'プロジェクト企画'],
+                'コスト': ['コスト削減', 'コスト管理', '効率化'],
+                '組織': ['組織運営', '組織開発', 'チームビルディング'],
+                '目標': ['目標設定', '目標管理', 'KPI管理'],
+                '交渉': ['交渉術', '交渉力', 'ネゴシエーション'],
+                '提案': ['提案力', 'プレゼンテーション', '企画提案'],
+                '研修': ['人材育成', '教育', 'スキルアップ'],
+                'イノベーション': ['創造性', 'イノベーション', '新規事業'],
+                'プロジェクト': ['プロジェクト管理', 'PM', 'プロジェクトマネジメント']
+            }
+            
+            for keyword, related_tags in transcript_keywords.items():
+                if keyword in transcript:
+                    tags.extend(related_tags)
+        
+        # Add skill-based tags with enhanced mapping
+        skill_mappings = {
+            'コミュニケーション': ['コミュニケーション', '対人スキル', '説得力', '傾聴'],
+            'マネジメント': ['マネジメント', 'プロジェクト管理', '目標設定', '人材育成'],
+            'リーダーシップ': ['リーダーシップ', 'チームビルディング', '組織運営'],
+            'マーケティング': ['マーケティング戦略', 'マーケット分析', 'ブランド戦略'],
+            'セールス': ['営業スキル', 'セールステクニック', '商談力']
+        }
+        
+        for skill_key, skill_tags in skill_mappings.items():
+            if skill_key in skill:
+                tags.extend(skill_tags)
+        
+        # Add skill as-is if provided
         if skill:
             tags.append(skill)
             tags.append(f"{skill}スキル")
@@ -208,7 +266,12 @@ class AIAPIHandler:
         # Add common business tags
         tags.extend(['ビジネススキル', '社会人教育', '研修動画'])
         
-        return list(set(tags))  # Remove duplicates
+        # Generate content-based unique identifier to ensure different content gets different tags
+        import hashlib
+        content_hash = hashlib.md5(all_content.encode()).hexdigest()[:6]
+        tags.append(f"Content-{content_hash}")
+        
+        return list(set(tags))[:20]  # Remove duplicates and expand limit
 
 # Integration with API server
 def integrate_with_api_server():

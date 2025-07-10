@@ -253,22 +253,64 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         """Generate sample tags for simulation mode"""
         title = video.get('title', '').lower()
         skill = video.get('skill', '').lower()
+        transcript = video.get('transcript', '').lower()
+        description = video.get('description', '').lower()
+        summary = video.get('summary', '').lower()
         
         base_tags = []
         
-        # Title-based tags
-        if 'プレゼン' in title:
-            base_tags.extend(['プレゼンテーション', 'スピーチ', '発表技法', '聴衆分析'])
-        if 'マーケティング' in title:
-            base_tags.extend(['マーケティング', 'SEO', 'デジタル戦略', 'ブランディング'])
-        if 'チーム' in title:
-            base_tags.extend(['チームワーク', 'リーダーシップ', 'コラボレーション'])
+        # Combine all text content for analysis
+        all_content = f"{title} {skill} {description} {summary} {transcript}".lower()
         
-        # Skill-based tags
-        if 'コミュニケーション' in skill:
-            base_tags.extend(['コミュニケーション', '対人スキル', '説得力'])
-        if 'マネジメント' in skill:
-            base_tags.extend(['マネジメント', 'プロジェクト管理', '目標設定'])
+        # Enhanced keyword matching using transcript content
+        keyword_mappings = {
+            'プレゼン': ['プレゼンテーション', 'スピーチ', '発表技法', '聴衆分析'],
+            'マーケティング': ['マーケティング', 'SEO', 'デジタル戦略', 'ブランディング'],
+            'チーム': ['チームワーク', 'リーダーシップ', 'コラボレーション'],
+            'データ': ['データ分析', 'データ活用', 'ビジネス分析', '統計'],
+            'セールス': ['営業', 'セールス', '顧客対応', '提案'],
+            '戦略': ['戦略立案', '企画', 'プランニング', '戦略思考'],
+            '効率': ['効率化', '生産性', '時間管理', 'パフォーマンス'],
+            '問題': ['問題解決', '課題解決', 'トラブルシューティング'],
+            '創造': ['創造性', 'イノベーション', 'アイデア発想'],
+            '顧客': ['顧客満足', 'CS', '顧客体験', 'CX'],
+            'デジタル': ['DX', 'デジタル化', 'IT活用', 'テクノロジー'],
+            '品質': ['品質管理', 'QC', '改善', 'カイゼン']
+        }
+        
+        # Apply enhanced keyword matching to all content
+        for keyword, tags in keyword_mappings.items():
+            if keyword in all_content:
+                base_tags.extend(tags)
+        
+        # Transcript-specific content analysis
+        if transcript:
+            # Extract specific concepts from transcript
+            if '顧客' in transcript:
+                base_tags.extend(['顧客理解', '顧客ニーズ', '顧客志向'])
+            if '売上' in transcript or '収益' in transcript:
+                base_tags.extend(['売上向上', '収益改善', '業績向上'])
+            if '改善' in transcript:
+                base_tags.extend(['業務改善', 'プロセス改善', '継続改善'])
+            if '分析' in transcript:
+                base_tags.extend(['分析手法', 'データドリブン', '定量分析'])
+            if '企画' in transcript:
+                base_tags.extend(['企画立案', '企画力', 'プロジェクト企画'])
+            if 'コスト' in transcript:
+                base_tags.extend(['コスト削減', 'コスト管理', '効率化'])
+        
+        # Skill-based tags (enhanced)
+        skill_mappings = {
+            'コミュニケーション': ['コミュニケーション', '対人スキル', '説得力', '傾聴'],
+            'マネジメント': ['マネジメント', 'プロジェクト管理', '目標設定', '人材育成'],
+            'リーダーシップ': ['リーダーシップ', 'チームビルディング', '組織運営'],
+            'マーケティング': ['マーケティング戦略', 'マーケット分析', 'ブランド戦略'],
+            'セールス': ['営業スキル', 'セールステクニック', '商談力']
+        }
+        
+        for skill_key, skill_tags in skill_mappings.items():
+            if skill_key in skill:
+                base_tags.extend(skill_tags)
         
         # AI engine specific tags (simulation)
         if ai_engine == 'openai':
@@ -280,6 +322,11 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         
         # Add common business tags
         base_tags.extend(['ビジネススキル', '職場効率', '成果向上'])
+        
+        # Generate unique identifier based on content to ensure uniqueness
+        import hashlib
+        content_hash = hashlib.md5(all_content.encode()).hexdigest()[:4]
+        base_tags.append(f"ID-{content_hash}")
         
         return list(set(base_tags))[:15]  # Remove duplicates and limit
     
