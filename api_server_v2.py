@@ -611,15 +611,19 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'))
 
 if __name__ == '__main__':
-    PORT = 8080
+    # 環境変数からポートとホストを取得（本番環境対応）
+    PORT = int(os.environ.get('PORT', 8080))
+    HOST = os.environ.get('HOST', '')
+    
     Handler = TagGeneratorAPIHandler
     
-    print(f"Tag Generator API Server v2.0 starting on port {PORT}")
+    print(f"Tag Generator API Server v2.0 starting on {HOST or 'all interfaces'}:{PORT}")
     print(f"AI API integration: {'ENABLED' if AI_ENABLED else 'DISABLED (simulation mode)'}")
-    print(f"Access: http://localhost:{PORT}")
+    print(f"Environment: {'PRODUCTION' if PORT != 8080 else 'DEVELOPMENT'}")
+    print(f"Access: http://{HOST or 'localhost'}:{PORT}")
     print("Press Ctrl+C to stop")
     
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+    with socketserver.TCPServer((HOST, PORT), Handler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
