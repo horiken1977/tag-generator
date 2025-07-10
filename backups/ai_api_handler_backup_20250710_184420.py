@@ -54,9 +54,46 @@ class AIAPIHandler:
             print("Warning: No API keys found. Will use fallback mode.")
     
     def generate_tags_prompt(self, video_data):
-        """旧来のタグ生成プロンプト（二段階処理では使用しない）"""
-        print("⚠️ 旧来のタグ生成プロンプトは使用しないでください。二段階処理を使用してください。")
-        return "エラー:旧来モード使用、二段階処理を使用してください"
+        """Generate prompt for tag generation"""
+        # Expand transcript limit for better context
+        transcript = video_data.get('transcript', '')
+        transcript_excerpt = transcript[:1500] if transcript else ''  # Increased from 500 to 1500
+        
+        return f"""
+以下のマーケティング教育動画の情報から、検索性の高いタグを15〜20個生成してください。
+タグは日本語で、具体的かつ実用的なものにしてください。
+
+タイトル: {video_data.get('title', '')}
+スキル名: {video_data.get('skill', '')}
+説明文: {video_data.get('description', '')}
+要約: {video_data.get('summary', '')}
+文字起こし（重要）: {transcript_excerpt}
+
+タグ生成の基準:
+1. 動画の主要なトピックとスキル
+2. 対象となる職種や業界
+3. 解決する課題や目的
+4. 使用されるツールや手法
+5. レベル（初級、中級、上級）
+6. 文字起こし内容から読み取れる具体的な手法やポイント
+7. 実際に話されている事例やケーススタディ
+
+【絶対に守るべき厳格なルール】:
+1. 文字起こし内容を最優先で分析し、そこから具体的なキーワードを抽出すること
+2. 同じタイトルでも文字起こし内容が異なれば、必ず異なるタグセットを生成すること
+3. 以下のような汎用的すぎるタグは絶対に生成禁止：
+   - 「6つの要素」「8つの分類」「4つのポイント」「3つの手法」等の数字+汎用名詞
+   - 「要素」「分類」「ポイント」「手法」「方法」「技術」等の単体使用
+   - 「基本」「応用」「実践」「理論」「概要」「入門」等の抽象的レベル表現
+4. 必須要件：文字起こしから具体的な以下を抽出してタグ化：
+   - 実際に言及された企業名・サービス名・ツール名
+   - 具体的な数値や指標名（ROI、CPA、CTR等）
+   - 専門的な手法や理論の正式名称
+   - 実際に説明された実務プロセスや業務フロー
+5. 文字起こし内容の独自性を必ず反映：同一タイトルでも内容が違えば全く違うタグにする
+
+出力：具体的で検索価値の高いタグのみをカンマ区切りで出力。汎用的な単語は一切含めない。
+"""
     
     def filter_generic_tags(self, tags):
         """Filter out generic and meaningless tags"""
@@ -325,9 +362,23 @@ class AIAPIHandler:
             return None
     
     def generate_tags(self, video_data, ai_engine='openai'):
-        """旧来のタグ生成メソッド（二段階処理では使用しない）"""
-        print("⚠️ 旧来のタグ生成メソッドは使用しないでください。二段階処理を使用してください。")
-        return ['エラー:旧来モード使用', '二段階処理を使用してください']
+        """Generate tags using specified AI engine"""
+        prompt = self.generate_tags_prompt(video_data)
+        
+        if ai_engine == 'openai':
+            tags = self.call_openai(prompt)
+        elif ai_engine == 'claude':
+            tags = self.call_claude(prompt)
+        elif ai_engine == 'gemini':
+            tags = self.call_gemini(prompt)
+        else:
+            tags = None
+        
+        # Fallback to simple generation if API fails
+        if not tags:
+            tags = self.generate_fallback_tags(video_data)
+        
+        return tags[:20]  # Limit to 20 tags
     
     def generate_tags_from_candidates(self, video_data: dict, tag_candidates: list, ai_engine: str = 'openai') -> list:
         """
