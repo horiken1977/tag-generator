@@ -6,6 +6,8 @@ requirements.txt
 .env
 venv/
 env/
+*.toml
+setup.py
 
 # Ignore legacy HTML/PHP files
 *.php
