@@ -59,13 +59,29 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
     
     def handle_api_get(self):
         if self.path == '/api/status':
+            # Check actual API key availability
+            available_engines = []
+            if AI_ENABLED:
+                if hasattr(ai_handler, 'api_keys'):
+                    if ai_handler.api_keys.get('OPENAI_API_KEY'):
+                        available_engines.append('openai')
+                    if ai_handler.api_keys.get('CLAUDE_API_KEY'):
+                        available_engines.append('claude')
+                    if ai_handler.api_keys.get('GEMINI_API_KEY'):
+                        available_engines.append('gemini')
+            
+            production_mode = len(available_engines) > 0
+            
             self.send_json_response({
                 'status': 'running',
                 'timestamp': datetime.now().isoformat(),
                 'version': '2.0.0',
                 'features': ['sheets_api', 'ai_processing', 'tag_optimization'],
                 'ai_enabled': AI_ENABLED,
-                'ai_engines': ['openai', 'claude', 'gemini'] if AI_ENABLED else []
+                'production_mode': production_mode,
+                'available_engines': available_engines,
+                'default_engine': available_engines[0] if available_engines else 'simulation',
+                'force_production': True  # Force production mode when API keys are available
             })
         else:
             self.send_error(404)
@@ -225,10 +241,16 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
             tags = None
             ai_mode = 'simulation'
             
-            if AI_ENABLED and use_real_ai:
+            # Force production mode if API keys are available
+            force_production = AI_ENABLED and hasattr(ai_handler, 'api_keys') and any(
+                ai_handler.api_keys.get(key) for key in ['OPENAI_API_KEY', 'CLAUDE_API_KEY', 'GEMINI_API_KEY']
+            )
+            
+            if force_production or (AI_ENABLED and use_real_ai):
                 # Try real AI API first
                 try:
                     print(f"Processing video {i+1}/{len(video_data)}: {video.get('title', 'Unknown')[:50]}...")
+                    print(f"  Using {ai_engine} API in PRODUCTION MODE")
                     tags = ai_handler.generate_tags(video, ai_engine)
                     if tags and len(tags) > 0:
                         ai_mode = 'real_ai'
@@ -241,7 +263,7 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"  ✗ AI processing error: {str(e)}")
                     tags = None
             
-            # Fallback to simulation if AI failed or not enabled
+            # Fallback to simulation only if AI completely failed
             if not tags:
                 print(f"  → Using enhanced simulation mode")
                 tags = self.generate_sample_tags(video, ai_engine)
