@@ -291,7 +291,8 @@
         function getApiUrl(endpoint) {
             if (IS_PRODUCTION) {
                 // 本番環境ではPHPプロキシを使用
-                return `api_proxy.php?path=${encodeURIComponent(endpoint)}`;
+                // 一時的にデバッグ版を使用
+                return `api_proxy_debug.php?path=${encodeURIComponent(endpoint)}`;
             } else {
                 // 開発環境では直接APIサーバーにアクセス
                 return endpoint;
