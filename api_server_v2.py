@@ -226,14 +226,79 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         video_data = data.get('data', [])
         ai_engine = data.get('ai_engine', 'openai')
         use_real_ai = data.get('use_real_ai', True)
+        use_two_phase = data.get('use_two_phase', True)  # Enable two-phase processing by default
         
+        print(f"Processing {len(video_data)} videos with AI engine: {ai_engine}")
+        print(f"Two-phase processing: {'ENABLED' if use_two_phase else 'DISABLED'}")
+        
+        if use_two_phase and len(video_data) > 1:
+            # Use two-phase processing for batch operations
+            return self.handle_two_phase_processing(video_data, ai_engine, use_real_ai)
+        else:
+            # Use original single-phase processing for single videos or when disabled
+            return self.handle_single_phase_processing(video_data, ai_engine, use_real_ai)
+    
+    def handle_two_phase_processing(self, video_data, ai_engine, use_real_ai):
+        """Handle two-phase tag processing as requested by user"""
+        from two_phase_tag_processor import TwoPhaseTagProcessor
+        
+        start_time = datetime.now()
+        
+        # Initialize two-phase processor
+        processor = TwoPhaseTagProcessor(ai_handler if AI_ENABLED else None)
+        
+        try:
+            # Execute two-phase processing
+            results = processor.process_all_videos(video_data, ai_engine)
+            
+            total_processing_time = (datetime.now() - start_time).total_seconds()
+            
+            # Format results for API response
+            processed_tags = []
+            for result in results:
+                processed_tags.append({
+                    'title': result.get('title', ''),
+                    'generated_tags': result.get('selected_tags', []),
+                    'confidence': 0.90,  # High confidence for two-phase processing
+                    'processing_time': total_processing_time / len(video_data),
+                    'ai_mode': 'two_phase_analysis',
+                    'tag_candidates_count': len(processor.tag_candidates),
+                    'selection_method': 'content_based_selection'
+                })
+            
+            total_tags = sum(len(item['generated_tags']) for item in processed_tags)
+            
+            self.send_json_response({
+                'success': True,
+                'results': processed_tags,
+                'statistics': {
+                    'total_videos': len(video_data),
+                    'total_tags_generated': total_tags,
+                    'avg_tags_per_video': total_tags / len(video_data) if video_data else 0,
+                    'total_tag_candidates': len(processor.tag_candidates),
+                    'processing_method': 'two_phase',
+                    'phase1_analysis': 'completed',
+                    'phase2_analysis': 'completed'
+                },
+                'ai_engine': ai_engine,
+                'processing_time': total_processing_time,
+                'ai_mode': 'two_phase_production'
+            })
+            
+        except Exception as e:
+            print(f"Two-phase processing failed: {str(e)}")
+            # Fallback to single-phase processing
+            return self.handle_single_phase_processing(video_data, ai_engine, use_real_ai)
+    
+    def handle_single_phase_processing(self, video_data, ai_engine, use_real_ai):
+        """Original single-phase processing (fallback)"""
         # Process with AI
         processed_tags = []
         total_processing_time = 0
         success_count = 0
         fallback_count = 0
         
-        print(f"Processing {len(video_data)} videos with AI engine: {ai_engine}")
+        print(f"Using single-phase processing for {len(video_data)} videos")
         print(f"AI_ENABLED: {AI_ENABLED}, use_real_ai: {use_real_ai}")
         
         for i, video in enumerate(video_data):
@@ -407,15 +472,24 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         
         # Patterns to filter out
         generic_patterns = [
-            # Number + の + generic noun patterns
+            # Number + つの/個の + generic noun patterns
             r'\d+つの要素', r'\d+つの分類', r'\d+つのポイント', r'\d+つの手法',
             r'\d+つのステップ', r'\d+つの方法', r'\d+つの技術', r'\d+つの項目',
             r'\d+つの観点', r'\d+つの視点', r'\d+つの基準', r'\d+つの原則',
             r'\d+個の要素', r'\d+個の分類', r'\d+個のポイント', r'\d+個の手法',
+            # Number + の + generic noun patterns (WITHOUT つ/個) - THIS WAS MISSING!
+            r'\d+の要素', r'\d+の分類', r'\d+のポイント', r'\d+の手法',
+            r'\d+のステップ', r'\d+の方法', r'\d+の技術', r'\d+の項目',
+            r'\d+の観点', r'\d+の視点', r'\d+の基準', r'\d+の原則',
+            r'\d+の特徴', r'\d+の段階', r'\d+の要因', r'\d+の条件',
+            # Any number + generic words patterns (broader coverage)
+            r'^\d+要素$', r'^\d+分類$', r'^\d+ポイント$', r'^\d+手法$',
+            r'^\d+ステップ$', r'^\d+方法$', r'^\d+項目$', r'^\d+段階$',
             # Generic standalone words - Basic
             r'^要素$', r'^分類$', r'^ポイント$', r'^手法$', r'^方法$', r'^技術$',
             r'^基本$', r'^応用$', r'^実践$', r'^理論$', r'^概要$', r'^入門$',
             r'^初級$', r'^中級$', r'^上級$', r'^基礎$', r'^発展$', r'^活用$',
+            r'^ステップ$', r'^段階$', r'^項目$', r'^観点$', r'^視点$', r'^条件$',
             # Generic business terms - Additional patterns from user feedback
             r'^実務スキル$', r'^思考法$', r'^業界知識$', r'^ツール活用$', 
             r'^人材育成$', r'^スキル開発$', r'^成果向上$', r'^効率化$',

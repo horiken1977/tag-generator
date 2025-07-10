@@ -102,15 +102,24 @@ class AIAPIHandler:
         
         # Patterns to filter out
         generic_patterns = [
-            # Number + の + generic noun patterns
+            # Number + つの/個の + generic noun patterns
             r'\d+つの要素', r'\d+つの分類', r'\d+つのポイント', r'\d+つの手法',
             r'\d+つのステップ', r'\d+つの方法', r'\d+つの技術', r'\d+つの項目',
             r'\d+つの観点', r'\d+つの視点', r'\d+つの基準', r'\d+つの原則',
             r'\d+個の要素', r'\d+個の分類', r'\d+個のポイント', r'\d+個の手法',
+            # Number + の + generic noun patterns (WITHOUT つ/個) - THIS WAS MISSING!
+            r'\d+の要素', r'\d+の分類', r'\d+のポイント', r'\d+の手法',
+            r'\d+のステップ', r'\d+の方法', r'\d+の技術', r'\d+の項目',
+            r'\d+の観点', r'\d+の視点', r'\d+の基準', r'\d+の原則',
+            r'\d+の特徴', r'\d+の段階', r'\d+の要因', r'\d+の条件',
+            # Any number + generic words patterns (broader coverage)
+            r'^\d+要素$', r'^\d+分類$', r'^\d+ポイント$', r'^\d+手法$',
+            r'^\d+ステップ$', r'^\d+方法$', r'^\d+項目$', r'^\d+段階$',
             # Generic standalone words - Basic
             r'^要素$', r'^分類$', r'^ポイント$', r'^手法$', r'^方法$', r'^技術$',
             r'^基本$', r'^応用$', r'^実践$', r'^理論$', r'^概要$', r'^入門$',
             r'^初級$', r'^中級$', r'^上級$', r'^基礎$', r'^発展$', r'^活用$',
+            r'^ステップ$', r'^段階$', r'^項目$', r'^観点$', r'^視点$', r'^条件$',
             # Generic business terms - Additional patterns from user feedback
             r'^実務スキル$', r'^思考法$', r'^業界知識$', r'^ツール活用$', 
             r'^人材育成$', r'^スキル開発$', r'^成果向上$', r'^効率化$',
@@ -370,6 +379,60 @@ class AIAPIHandler:
             tags = self.generate_fallback_tags(video_data)
         
         return tags[:20]  # Limit to 20 tags
+    
+    def generate_tags_from_candidates(self, video_data: dict, tag_candidates: list, ai_engine: str = 'openai') -> list:
+        """
+        Generate tags by selecting from pre-analyzed candidates (Phase 2 of two-phase processing)
+        
+        Args:
+            video_data: Individual video data including transcript
+            tag_candidates: List of candidate tags from Phase 1 analysis
+            ai_engine: AI engine to use
+            
+        Returns:
+            List of selected tags (10-15 items)
+        """
+        transcript = video_data.get('transcript', '')
+        transcript_excerpt = transcript[:2000] if transcript else ''
+        
+        candidates_str = ', '.join(tag_candidates)
+        
+        prompt = f"""
+以下の動画について、提供されたタグ候補から最も適切なタグを10-15個選択してください。
+
+動画情報:
+タイトル: {video_data.get('title', '')}
+スキル名: {video_data.get('skill', '')}
+説明文: {video_data.get('description', '')}
+要約: {video_data.get('summary', '')}
+文字起こし（最重要）: {transcript_excerpt}
+
+利用可能なタグ候補:
+{candidates_str}
+
+【重要な選択基準】:
+1. 文字起こし内容に直接言及されているキーワードを最優先で選択
+2. この動画の具体的な内容を最も正確に表現するタグを選択
+3. 検索時に実用的で具体性の高いタグを選択
+4. 他の動画との差別化に役立つ特徴的なタグを選択
+5. 汎用的すぎるタグは避ける
+
+【厳守事項】:
+- 新しいタグは作成せず、提供された候補からのみ選択すること
+- 文字起こしに言及がないタグは選択しないこと
+- 10-15個の範囲で選択すること
+
+出力: 選択したタグのみをカンマ区切りで出力してください。
+"""
+        
+        if ai_engine == 'openai':
+            return self.call_openai(prompt)
+        elif ai_engine == 'claude':
+            return self.call_claude(prompt)
+        elif ai_engine == 'gemini':
+            return self.call_gemini(prompt)
+        else:
+            return self.generate_fallback_tags(video_data)
     
     def generate_fallback_tags(self, video_data):
         """Generate fallback tags without AI"""
