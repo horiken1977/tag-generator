@@ -113,43 +113,68 @@
         
         <div class="status">
             <h2>✅ システム稼働中</h2>
-            <p>デモ版とAPI連携版の両方が利用可能です</p>
+            <p>最新の段階分離式システム（v3.0）をご利用ください</p>
+            <p style="margin-top: 10px; color: #ffeaa7;">✨ 「6つの要素」などの汎用タグを完全に除外し、信頼性の高いタグを生成します</p>
         </div>
         
         <div class="app-grid">
-            <div class="app-card">
-                <h2>🎯 段階分離式</h2>
-                <span class="version-badge">v3.0 NEW!</span>
+            <div class="app-card" style="border: 3px solid #ff6b6b; box-shadow: 0 0 20px rgba(255,107,107,0.3);">
+                <h2>🎯 段階分離式システム</h2>
+                <span class="version-badge" style="background: #ff6b6b;">v3.0 最新版・推奨!</span>
                 <p>信頼性の高い2段階処理システム</p>
                 <ul style="text-align: left; margin: 15px 0;">
-                    <li>✅ タグ候補の確認・承認</li>
-                    <li>✅ 汎用タグの完全除外</li>
+                    <li>✅ タグ候補の確認・承認機能</li>
+                    <li>✅ 「6つの要素」等の汎用タグを完全除外</li>
                     <li>✅ 文字起こし含む詳細分析</li>
                     <li>🛡️ 高信頼性タグ生成</li>
                 </ul>
-                <a href="webapp_staged.html" class="btn btn-api">🎯 段階分離版を開く（推奨）</a>
+                <a href="webapp_staged.html" class="btn btn-api" style="background: linear-gradient(45deg, #ff6b6b, #ee5a24); font-size: 1.2em; padding: 20px 40px;">🎯 最新版を使用する（推奨）</a>
             </div>
-            
-            <div class="app-card">
+        </div>
+        
+        <h3 style="margin: 30px 0 20px 0; opacity: 0.7;">過去バージョン（参考）</h3>
+        <div class="app-grid">
+            <div class="app-card" style="opacity: 0.8;">
                 <h2>🔗 API連携版</h2>
-                <span class="version-badge">v2.0</span>
-                <p>実際のGoogle Sheets API連携</p>
-                <ul style="text-align: left; margin: 15px 0;">
+                <span class="version-badge" style="background: #666;">v2.0 旧版</span>
+                <p>Google Sheets API連携（旧方式）</p>
+                <ul style="text-align: left; margin: 15px 0; font-size: 0.9em;">
                     <li>✅ Google Sheets接続</li>
                     <li>✅ リアルタイム処理</li>
-                    <li>✅ AI エンジン連携</li>
-                    <li>⚡ パフォーマンス最適化</li>
+                    <li>⚠️ 汎用タグが含まれる可能性</li>
                 </ul>
-                <a href="webapp_api.html" class="btn">⚡ API版を開く</a>
+                <a href="webapp_api.html" class="btn" style="background: #999;">旧API版を開く</a>
+            </div>
+            
+            <div class="app-card" style="opacity: 0.8;">
+                <h2>📱 デモ版</h2>
+                <span class="version-badge" style="background: #666;">v1.0 旧版</span>
+                <p>シミュレーション機能のみ</p>
+                <ul style="text-align: left; margin: 15px 0; font-size: 0.9em;">
+                    <li>✅ UI体験</li>
+                    <li>✅ 処理フローの確認</li>
+                    <li>❌ 実データ処理不可</li>
+                </ul>
+                <a href="webapp.html" class="btn" style="background: #999;">旧デモ版を開く</a>
             </div>
         </div>
         
         <div class="features">
             <div class="feature-card">
+                <h3>🆕 v3.0 新機能</h3>
+                <ul>
+                    <li>✨ 2段階分離処理</li>
+                    <li>✨ タグ候補承認機能</li>
+                    <li>✨ 汎用タグ完全除外</li>
+                    <li>✨ 文字起こし重視分析</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
                 <h3>🤖 AI エンジン</h3>
                 <ul>
-                    <li>OpenAI GPT-4</li>
-                    <li>Claude 3.5 Sonnet</li>
+                    <li>OpenAI GPT-3.5/4</li>
+                    <li>Claude 3</li>
                     <li>Google Gemini</li>
                 </ul>
             </div>
@@ -158,26 +183,17 @@
                 <h3>📊 データ処理</h3>
                 <ul>
                     <li>400動画の一括処理</li>
-                    <li>6000タグ→200タグ最適化</li>
-                    <li>重複排除・重要度スコアリング</li>
+                    <li>高精度タグ生成</li>
+                    <li>重複排除・最適化</li>
                 </ul>
             </div>
             
             <div class="feature-card">
-                <h3>🔐 セキュリティ</h3>
+                <h3>🔐 信頼性</h3>
                 <ul>
-                    <li>OAuth 2.0認証</li>
-                    <li>API キー暗号化管理</li>
-                    <li>HTTPS通信</li>
-                </ul>
-            </div>
-            
-            <div class="feature-card">
-                <h3>🌐 インターフェース</h3>
-                <ul>
-                    <li>レスポンシブWebUI</li>
-                    <li>リアルタイム進捗表示</li>
-                    <li>結果ダウンロード</li>
+                    <li>タグ候補事前確認</li>
+                    <li>人の目によるチェック</li>
+                    <li>高品質タグ保証</li>
                 </ul>
             </div>
         </div>
