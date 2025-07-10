@@ -7,6 +7,8 @@ import urllib.parse
 import re
 import os
 import sys
+import csv
+import io
 from datetime import datetime
 
 # Import AI handler
@@ -225,14 +227,115 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
         
-        # TODO: Implement actual CSV reading from Google Sheets
-        self.send_json_response({
-            'success': True,
-            'data': [],
-            'total_rows': 0,
-            'processed_rows': 0,
-            'message': 'Real-time data reading will be implemented'
-        })
+        # Google Sheetsから実際にデータを読み込み
+        try:
+            # Extract spreadsheet ID
+            sheet_id_match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
+            if not sheet_id_match:
+                self.send_json_response({
+                    'success': False,
+                    'error': 'Google Sheets URLからIDを抽出できません'
+                })
+                return
+            
+            sheet_id = sheet_id_match.group(1)
+            csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
+            
+            # データ取得
+            req = urllib.request.Request(csv_url)
+            req.add_header('User-Agent', 'TagGenerator/3.0')
+            
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.getcode() == 200:
+                    # Shift-JISでデコード、エラー時はUTF-8でフォールバック
+                    raw_content = response.read()
+                    try:
+                        content = raw_content.decode('shift-jis')
+                        print(f"CSVをShift-JISでデコードしました")
+                    except UnicodeDecodeError:
+                        try:
+                            content = raw_content.decode('utf-8')
+                            print(f"CSVをUTF-8でデコードしました（Shift-JISで失敗）")
+                        except UnicodeDecodeError:
+                            content = raw_content.decode('utf-8', errors='ignore')
+                            print(f"CSVをUTF-8でデコードしました（エラー無視）")
+                    lines = content.strip().split('\n')
+                    
+                    if len(lines) < 2:
+                        self.send_json_response({
+                            'success': False,
+                            'error': 'スプレッドシートが空か、データが不十分です'
+                        })
+                        return
+                    
+                    # CSVパーシング
+                    csv_reader = csv.DictReader(io.StringIO(content))
+                    processed_data = []
+                    
+                    for row in csv_reader:
+                        # 列名を正規化（柔軟なマッピング）
+                        normalized_row = {}
+                        for key, value in row.items():
+                            key_lower = key.lower().strip()
+                            value_clean = str(value).strip() if value else ''
+                            
+                            # 列名のマッピング
+                            if 'title' in key_lower or 'タイトル' in key_lower:
+                                normalized_row['title'] = value_clean
+                            elif 'skill' in key_lower or 'スキル' in key_lower:
+                                normalized_row['skill'] = value_clean
+                            elif 'description' in key_lower or '説明' in key_lower:
+                                normalized_row['description'] = value_clean
+                            elif 'summary' in key_lower or '要約' in key_lower:
+                                normalized_row['summary'] = value_clean
+                            elif 'transcript' in key_lower or '文字起こし' in key_lower:
+                                normalized_row['transcript'] = value_clean
+                        
+                        # 必須フィールドの確認
+                        if normalized_row.get('title'):
+                            # デフォルト値を設定
+                            if not normalized_row.get('skill'):
+                                normalized_row['skill'] = 'ビジネススキル'
+                            if not normalized_row.get('description'):
+                                normalized_row['description'] = normalized_row['title']
+                            if not normalized_row.get('summary'):
+                                normalized_row['summary'] = normalized_row['title']
+                            if not normalized_row.get('transcript'):
+                                normalized_row['transcript'] = normalized_row.get('description', '')
+                            
+                            processed_data.append(normalized_row)
+                    
+                    self.send_json_response({
+                        'success': True,
+                        'data': processed_data,
+                        'total_rows': len(processed_data),
+                        'processed_rows': len(processed_data),
+                        'source': 'google_sheets',
+                        'sheet_id': sheet_id
+                    })
+                    
+                else:
+                    self.send_json_response({
+                        'success': False,
+                        'error': f'HTTP {response.getcode()}: スプレッドシートにアクセスできません'
+                    })
+                    
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                self.send_json_response({
+                    'success': False,
+                    'error': 'アクセスが拒否されました。スプレッドシートを公開設定にしてください。'
+                })
+            else:
+                self.send_json_response({
+                    'success': False,
+                    'error': f'HTTPエラー {e.code}: {e.reason}'
+                })
+        except Exception as e:
+            self.send_json_response({
+                'success': False,
+                'error': f'データ読み込みエラー: {str(e)}'
+            })
     
     def handle_ai_process(self, data):
         video_data = data.get('data', [])
