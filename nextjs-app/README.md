@@ -37,9 +37,19 @@ npm run dev
 
 ### Vercelデプロイ
 
+#### 初回セットアップ
 1. VercelでGitHubリポジトリを連携
 2. プロジェクトを選択
-3. 自動デプロイ開始
+3. Root Directory: `nextjs-app/`を設定
+4. 環境変数を設定（オプション）
+
+#### 自動デプロイ設定
+1. GitHub Secretsを設定（[詳細ガイド](../GITHUB_SECRETS_SETUP.md)）:
+   - `VERCEL_TOKEN`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+2. `main`ブランチへのプッシュで自動デプロイ開始
+3. PRでプレビューデプロイ自動作成
 
 ## 📁 ディレクトリ構造
 

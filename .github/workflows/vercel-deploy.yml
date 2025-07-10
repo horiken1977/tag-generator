@@ -1,0 +1,101 @@
+name: 🚀 Deploy to Vercel
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'nextjs-app/**'
+      - '.github/workflows/vercel-deploy.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'nextjs-app/**'
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+    
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: nextjs-app/package-lock.json
+    
+    - name: 🔧 Install Vercel CLI
+      run: npm install --global vercel@latest
+    
+    - name: 📚 Install Dependencies
+      working-directory: ./nextjs-app
+      run: npm ci
+    
+    - name: 🏗️ Build Project
+      working-directory: ./nextjs-app
+      run: npm run build
+    
+    - name: 🚀 Deploy to Vercel (Preview)
+      if: github.event_name == 'pull_request'
+      working-directory: ./nextjs-app
+      run: |
+        vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        echo "PREVIEW_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})" >> $GITHUB_ENV
+    
+    - name: 🌟 Deploy to Vercel (Production)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: ./nextjs-app
+      run: |
+        vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        echo "PRODUCTION_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> $GITHUB_ENV
+    
+    - name: 📝 Comment Preview URL
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `
+            ## 🚀 Preview Deployment
+            
+            ✅ Preview deployment successful!
+            
+            📱 **Preview URL**: ${process.env.PREVIEW_URL}
+            
+            🔧 **Build Info**:
+            - Framework: Next.js 14
+            - Commit: ${context.sha.substring(0, 7)}
+            - Branch: ${context.ref}
+            
+            ---
+            
+            プレビュー環境でタグ生成システムをテストできます。
+            `
+          })
+    
+    - name: 📊 Deployment Summary
+      if: always()
+      run: |
+        echo "## 📊 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          echo "- **Preview URL**: $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          echo "- **Production URL**: $PRODUCTION_URL" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

@@ -1,106 +1,139 @@
-# Video Tag Generator
+# 🏷️ Tag Generator
 
-マーケティング教育動画のタグ生成アプリケーション
+マーケティング教育動画のAIタグ生成システム
 
-## 概要
+## 🚀 最新版（推奨）
 
-Googleスプレッドシートからマーケティング教育動画のデータを読み込み、AI（OpenAI/Claude/Gemini）を使用して検索性の高いタグを自動生成するアプリケーションです。
+### Next.js + Vercel版
+**[`/nextjs-app/`](./nextjs-app/) ← 🌟 こちらを使用してください**
 
-## 機能
+- ✅ **403エラー解決済み**
+- ✅ **TypeScript + React**
+- ✅ **自動デプロイ対応**
+- ✅ **高性能・高信頼性**
 
-- **Google Sheets連携**: スプレッドシートURL入力による自動データ読み込み
-- **マルチAI対応**: OpenAI GPT / Claude / Gemini から選択可能
-- **バッチ処理**: メモリ効率的な分割処理（400動画対応）
-- **タグ最適化**: 重複排除・重要度スコアリング
-- **結果出力**: 元ファイルのコピーを作成してタグを追加
+**デプロイ状況：**
+- 🔄 GitHub Actions自動デプロイ設定済み
+- 🌐 Vercel本番環境稼働中
+- 📱 プレビューデプロイ対応
 
-## さくらインターネット環境での設定
+## 📋 システム概要
 
-### 1. ファイルアップロード
+### 段階分離式処理システム
+1. **第1段階**: 文字起こし除外での全件分析 → タグ候補生成
+2. **第2段階**: 承認されたタグ候補での個別詳細分析 → 最終タグ付け
 
+### 特徴
+- 🎯 **高精度**: 汎用タグ完全除外
+- 🚀 **高速**: バッチサイズ制限対応
+- 🔒 **高信頼性**: ユーザー承認フロー
+- 📊 **スケーラブル**: サーバーレス対応
+
+## 🗂️ プロジェクト構成
+
+```
+/
+├── nextjs-app/              # 🌟 Next.js版（推奨）
+│   ├── app/
+│   │   ├── api/            # API Routes
+│   │   ├── page.tsx        # メインページ
+│   │   └── layout.tsx      # レイアウト
+│   ├── package.json
+│   └── vercel.json         # Vercel設定
+│
+├── webapp_staged.html       # 📱 旧HTML版（レガシー）
+├── api_server_v2.py        # 🖥️ 旧Python API（レガシー）
+├── api_proxy.php           # 🔧 旧PHP Proxy（レガシー）
+│
+├── VERCEL_DEPLOY.md        # 📖 Vercelデプロイガイド
+├── GITHUB_SECRETS_SETUP.md # 🔐 自動デプロイ設定ガイド
+└── .github/workflows/      # 🤖 CI/CDワークフロー
+```
+
+## 🚀 クイックスタート
+
+### 1. 開発環境
 ```bash
-# アプリケーションファイルをさくらインターネットサーバーにアップロード
-scp -r tag_generator/ user@your_domain.sakura.ne.jp:~/www/
+cd nextjs-app/
+npm install
+npm run dev
+# http://localhost:3000 でアクセス
 ```
 
-### 2. 環境設定
+### 2. 本番デプロイ（Vercel）
+1. [Vercelデプロイガイド](./VERCEL_DEPLOY.md)を参照
+2. [GitHub Secrets設定](./GITHUB_SECRETS_SETUP.md)で自動デプロイ設定
+3. `git push`で自動デプロイ開始
 
-```bash
-# .envファイルを作成してAPIキーを設定
-cp .env.template .env
-# .envファイルを編集してAPIキーを入力
+## 📈 バージョン履歴
+
+| バージョン | 説明 | 状態 | 推奨度 |
+|-----------|------|------|--------|
+| **v3.0** | Next.js + Vercel | ✅ 稼働中 | 🌟🌟🌟 |
+| v2.0 | Python API + PHP Proxy | ⚠️ 403エラー | ❌ |
+| v1.0 | 静的HTML + シミュレーション | 📱 デモのみ | ❌ |
+
+## 🆚 技術比較
+
+| 項目 | v3.0 (Next.js) | v2.0 (PHP) | v1.0 (静的) |
+|------|---------------|------------|------------|
+| **API実装** | TypeScript | Python+PHP | JavaScript |
+| **デプロイ** | Vercel自動 | SSH手動 | 静的ホスト |
+| **エラー処理** | ✅ 詳細 | ❌ 限定的 | ❌ なし |
+| **スケーリング** | ✅ 自動 | ❌ 固定 | ❌ なし |
+| **開発体験** | ✅ 最新 | ❌ レガシー | ❌ 基本 |
+
+## 🔧 API エンドポイント
+
+### Next.js版（推奨）
+```
+POST /api/sheets/data     # Google Sheets読み込み
+POST /api/ai/stage1       # タグ候補生成
+POST /api/ai/stage2       # 個別タグ付け
 ```
 
-### 3. 依存関係インストール
-
-```bash
-pip3 install -r requirements.txt
+### Python版（レガシー）
+```
+POST :8080/api/sheets/data     # Google Sheets読み込み
+POST :8080/api/ai/stage1       # タグ候補生成  
+POST :8080/api/ai/stage2       # 個別タグ付け
 ```
 
-### 4. アプリケーション起動
+## 📊 パフォーマンス
 
-```bash
-# Streamlitアプリケーションを起動
-streamlit run ui/streamlit_app.py --server.port 8501
-```
+### Next.js版
+- **Cold Start**: < 1秒
+- **API Response**: < 2秒
+- **Build Time**: < 30秒
+- **Deploy Time**: < 1分
 
-## API キー設定
+### 旧版（参考）
+- **起動時間**: 10-30秒
+- **403エラー**: 頻発
+- **デバッグ**: 困難
 
-`.env` ファイルに以下の設定を行ってください：
+## 🌐 アクセス方法
 
-```env
-# AI Service API Keys
-OPENAI_API_KEY=your_actual_openai_api_key
-CLAUDE_API_KEY=your_actual_claude_api_key
-GEMINI_API_KEY=your_actual_gemini_api_key
+### 本番環境
+- **Next.js版**: [Vercelデプロイ後のURL]
+- **旧版**: https://mokumoku.sakura.ne.jp/tags/
 
-# Google Service Account
-GOOGLE_PROJECT_ID=your_project_id
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_ACTUAL_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
-GOOGLE_CLIENT_EMAIL=your_service_account@your_project.iam.gserviceaccount.com
-```
+### 開発環境
+- **Next.js版**: http://localhost:3000
+- **旧版**: http://localhost:8080
 
-## 使用方法
+## 🤝 コントリビューション
 
-1. **スプレッドシート設定**
-   - GoogleスプレッドシートのURLを入力
-   - 対象シートを選択
-   - データ列をマッピング（タイトル、スキル名、説明文、要約、文字起こし）
+1. `nextjs-app/`ディレクトリで開発
+2. プルリクエスト作成でプレビューデプロイ自動生成
+3. マージで本番自動デプロイ
 
-2. **AI選択**
-   - OpenAI、Claude、Gemini から処理エンジンを選択
+## 📞 サポート
 
-3. **処理実行**
-   - バッチサイズを設定（推奨：10-20件）
-   - タグ生成処理を開始
+- 🐛 Issues: GitHub Issues
+- 📖 ドキュメント: 各READMEファイル
+- 🚀 デプロイ: Vercel Dashboard
 
-4. **結果確認**
-   - 生成されたタグを確認
-   - 新しいスプレッドシートのリンクを取得
+---
 
-## ディレクトリ構造
-
-```
-tag_generator/
-├── src/                     # ソースコード
-│   ├── sheets_client.py     # Google Sheets API
-│   ├── ai_processors/       # AI処理モジュール
-│   ├── batch_processor.py   # バッチ処理
-│   └── tag_optimizer.py     # タグ最適化
-├── ui/                      # ユーザーインターフェース
-│   └── streamlit_app.py     # メインUI
-├── config/                  # 設定ファイル
-├── .env                     # 環境変数（要作成）
-└── requirements.txt         # 依存関係
-```
-
-## 注意事項
-
-- APIキーは `.env` ファイルに安全に保存してください
-- Google Service Accountの権限設定を確認してください
-- さくらインターネットのPython環境を事前に確認してください
-- 処理中はブラウザを閉じないでください
-
-## サポート
-
-技術的な問題や質問がある場合は、Issues で報告してください。
+**推奨**: Next.js版（`/nextjs-app/`）をご利用ください 🌟

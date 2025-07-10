@@ -133,6 +133,7 @@ jobs:
           
           # ファイル権限の修正（Forbidden対策）
           chmod 644 *.html *.css *.js 2>/dev/null || true
+          chmod 755 *.php 2>/dev/null || true
           chmod 755 . 2>/dev/null || true
           
           echo '✅ ファイル権限を設定しました'
