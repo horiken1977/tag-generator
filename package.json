@@ -1,0 +1,21 @@
+{
+  "name": "tag-generator-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tag Generator - Next.js version for Vercel",
+  "scripts": {
+    "dev": "cd nextjs-app && npm run dev",
+    "build": "cd nextjs-app && npm run build",
+    "start": "cd nextjs-app && npm run start",
+    "install-deps": "cd nextjs-app && npm install"
+  },
+  "workspaces": [
+    "nextjs-app"
+  ],
+  "repository": {
+    "type": "git", 
+    "url": "https://github.com/horiken1977/tag-generator.git"
+  },
+  "author": "horiken1977",
+  "license": "MIT"
+}

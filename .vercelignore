@@ -1,0 +1,28 @@
+# Ignore Python files and legacy code
+*.py
+*.pyc
+__pycache__/
+requirements.txt
+.env
+venv/
+env/
+
+# Ignore legacy HTML/PHP files
+*.php
+webapp*.html
+index.html
+
+# Ignore git and docs
+.git/
+.github/
+*.md
+docs/
+
+# Ignore logs and temporary files
+*.log
+*.pid
+.DS_Store
+node_modules/
+
+# Only include nextjs-app directory
+!nextjs-app/
