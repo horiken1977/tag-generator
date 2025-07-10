@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏷️ Tag Generator - 段階分離式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 16px;
+        }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+        }
+        .btn-success {
+            background: linear-gradient(45deg, #00b894, #00a085);
+        }
+        .stage-indicator {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .stage {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        .stage.active {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            transform: scale(1.1);
+        }
+        .stage.completed {
+            background: linear-gradient(45deg, #00b894, #00a085);
+        }
+        .candidates-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .candidate-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+        }
+        .candidate-checkbox {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        .candidate-text {
+            flex: 1;
+            font-size: 14px;
+        }
+        .status-panel {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .result-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .result-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ffeaa7;
+        }
+        .result-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .tag {
+            background: rgba(116, 185, 255, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            border: 1px solid rgba(116, 185, 255, 0.5);
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .alert-success {
+            background: rgba(0, 184, 148, 0.3);
+            border: 1px solid rgba(0, 184, 148, 0.5);
+        }
+        .alert-danger {
+            background: rgba(255, 107, 107, 0.3);
+            border: 1px solid rgba(255, 107, 107, 0.5);
+        }
+        .alert-info {
+            background: rgba(116, 185, 255, 0.3);
+            border: 1px solid rgba(116, 185, 255, 0.5);
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Tag Generator</h1>
+            <p>段階分離式タグ処理システム</p>
+        </div>
+
+        <!-- ステージインジケーター -->
+        <div class="stage-indicator">
+            <div class="stage active" id="stage1-indicator">
+                <span>📋 第1段階: タグ候補生成</span>
+            </div>
+            <div class="stage" id="stage2-indicator">
+                <span>✅ 第2段階: 個別タグ付け</span>
+            </div>
+        </div>
+
+        <!-- データ入力カード -->
+        <div class="card">
+            <h2>📊 データ入力</h2>
+            <div class="form-group">
+                <label for="sheetsUrl">Google Sheets URL:</label>
+                <input type="url" id="sheetsUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
+            </div>
+            <div class="form-group">
+                <label for="aiEngine">AIエンジン:</label>
+                <select id="aiEngine">
+                    <option value="openai">OpenAI (GPT-3.5)</option>
+                    <option value="claude">Claude</option>
+                    <option value="gemini">Gemini</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadSheetData()">📥 データ読み込み</button>
+            <button class="btn btn-secondary" onclick="usePreviewData()">🔍 プレビューデータ使用</button>
+        </div>
+
+        <!-- ステータスパネル -->
+        <div class="status-panel hidden" id="statusPanel">
+            <h3>📊 処理状況</h3>
+            <div id="statusContent"></div>
+        </div>
+
+        <!-- 第1段階: タグ候補生成 -->
+        <div class="card hidden" id="stage1Card">
+            <h2>📋 第1段階: タグ候補生成</h2>
+            <p>文字起こし列を除外して全動画データを分析し、タグ候補を生成します。</p>
+            <button class="btn" onclick="executeStage1()" id="stage1Btn">🚀 タグ候補生成開始</button>
+            
+            <div class="hidden" id="candidatesSection">
+                <h3>🏷️ 生成されたタグ候補</h3>
+                <p>以下のタグ候補を確認し、問題がないものにチェックを入れて承認してください：</p>
+                <div>
+                    <button class="btn btn-secondary" onclick="selectAllCandidates()">✅ 全選択</button>
+                    <button class="btn btn-secondary" onclick="deselectAllCandidates()">❌ 全解除</button>
+                </div>
+                <div class="candidates-container" id="candidatesContainer"></div>
+                <div>
+                    <span id="selectedCount">0</span> / <span id="totalCount">0</span> 個のタグ候補が選択されています
+                </div>
+                <button class="btn btn-success" onclick="approveAndProceed()" id="approveBtn" disabled>
+                    ✅ 承認して第2段階へ進む
+                </button>
+            </div>
+        </div>
+
+        <!-- 第2段階: 個別タグ付け -->
+        <div class="card hidden" id="stage2Card">
+            <h2>✅ 第2段階: 個別タグ付け</h2>
+            <p>承認されたタグ候補を使用して、文字起こしを含む各動画の詳細分析を行います。</p>
+            <div id="approvedCandidatesInfo"></div>
+            <button class="btn btn-success" onclick="executeStage2()" id="stage2Btn">🎯 個別タグ付け開始</button>
+        </div>
+
+        <!-- 結果表示 -->
+        <div class="card hidden" id="resultsCard">
+            <h2>🎉 タグ付け結果</h2>
+            <div id="resultsStats"></div>
+            <div class="results-grid" id="resultsContainer"></div>
+            <button class="btn" onclick="exportResults()">💾 結果をダウンロード</button>
+            <button class="btn btn-secondary" onclick="resetSystem()">🔄 新しい処理を開始</button>
+        </div>
+    </div>
+
+    <script>
+        let currentData = [];
+        let stage1Results = null;
+        let stage2Results = null;
+        let approvedCandidates = [];
+
+        function showStatus(message, type = 'info') {
+            const panel = document.getElementById('statusPanel');
+            const content = document.getElementById('statusContent');
+            panel.classList.remove('hidden');
+            content.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+
+        function showLoading(message) {
+            showStatus(`<div class="loading"><div class="spinner"></div>${message}</div>`, 'info');
+        }
+
+        async function loadSheetData() {
+            const url = document.getElementById('sheetsUrl').value;
+            if (!url) {
+                showStatus('Google Sheets URLを入力してください', 'danger');
+                return;
+            }
+
+            showLoading('データを読み込み中...');
+
+            try {
+                const response = await fetch('/api/sheets/data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    currentData = result.data;
+                    showStatus(`✅ ${result.data.length}件のデータを読み込みました`, 'success');
+                    document.getElementById('stage1Card').classList.remove('hidden');
+                } else {
+                    showStatus(`❌ データ読み込みエラー: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                showStatus(`❌ 接続エラー: ${error.message}`, 'danger');
+            }
+        }
+
+        function usePreviewData() {
+            currentData = [
+                {
+                    title: 'マーケティング指標と財務指標を結びつけるPDCA〜財務諸表を理解する〜',
+                    skill: 'マーケティング',
+                    description: 'ROIとCPAを使った効果測定の手法',
+                    summary: 'Google Analyticsを活用した分析手法とPDCAサイクル',
+                    transcript: 'まず最初に、Google Analyticsでユーザー行動を分析します。CPAが150円、ROIが300%という結果が出ています。PDCAサイクルを使って継続的に改善していきます。'
+                },
+                {
+                    title: 'Instagram マーケティング戦略',
+                    skill: 'SNSマーケティング', 
+                    description: 'Instagram を活用したブランディング手法',
+                    summary: 'エンゲージメント率向上とフォロワー獲得戦略',
+                    transcript: 'Instagramでは、ストーリーズ機能を活用することでエンゲージメント率が2.5倍向上しました。ハッシュタグ戦略も重要で、適切なタグを選ぶことでリーチが拡大します。'
+                }
+            ];
+            showStatus(`✅ プレビューデータ（${currentData.length}件）を読み込みました`, 'success');
+            document.getElementById('stage1Card').classList.remove('hidden');
+        }
+
+        async function executeStage1() {
+            if (!currentData.length) {
+                showStatus('データを先に読み込んでください', 'danger');
+                return;
+            }
+
+            showLoading('第1段階: タグ候補を生成中...');
+            document.getElementById('stage1Btn').disabled = true;
+
+            try {
+                const response = await fetch('/api/ai/stage1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: currentData })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    stage1Results = result;
+                    displayCandidates(result.tag_candidates);
+                    showStatus(`✅ ${result.candidate_count}個のタグ候補を生成しました`, 'success');
+                    document.getElementById('candidatesSection').classList.remove('hidden');
+                    document.getElementById('stage1-indicator').classList.add('completed');
+                } else {
+                    showStatus(`❌ 第1段階エラー: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                showStatus(`❌ 接続エラー: ${error.message}`, 'danger');
+            } finally {
+                document.getElementById('stage1Btn').disabled = false;
+            }
+        }
+
+        function displayCandidates(candidates) {
+            const container = document.getElementById('candidatesContainer');
+            const totalCount = document.getElementById('totalCount');
+            
+            totalCount.textContent = candidates.length;
+            
+            container.innerHTML = candidates.map((candidate, index) => `
+                <div class="candidate-item">
+                    <input type="checkbox" class="candidate-checkbox" id="candidate-${index}" 
+                           value="${candidate}" onchange="updateSelectedCount()">
+                    <label for="candidate-${index}" class="candidate-text">${candidate}</label>
+                </div>
+            `).join('');
+
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.candidate-checkbox');
+            const selected = Array.from(checkboxes).filter(cb => cb.checked);
+            const selectedCount = document.getElementById('selectedCount');
+            const approveBtn = document.getElementById('approveBtn');
+            
+            selectedCount.textContent = selected.length;
+            approveBtn.disabled = selected.length === 0;
+            
+            approvedCandidates = selected.map(cb => cb.value);
+        }
+
+        function selectAllCandidates() {
+            document.querySelectorAll('.candidate-checkbox').forEach(cb => cb.checked = true);
+            updateSelectedCount();
+        }
+
+        function deselectAllCandidates() {
+            document.querySelectorAll('.candidate-checkbox').forEach(cb => cb.checked = false);
+            updateSelectedCount();
+        }
+
+        function approveAndProceed() {
+            if (approvedCandidates.length === 0) {
+                showStatus('少なくとも1つのタグ候補を選択してください', 'danger');
+                return;
+            }
+
+            document.getElementById('stage2Card').classList.remove('hidden');
+            document.getElementById('stage2-indicator').classList.add('active');
+            
+            const info = document.getElementById('approvedCandidatesInfo');
+            info.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>${approvedCandidates.length}個のタグ候補が承認されました:</strong><br>
+                    ${approvedCandidates.slice(0, 10).join(', ')}${approvedCandidates.length > 10 ? '...' : ''}
+                </div>
+            `;
+            
+            showStatus(`✅ ${approvedCandidates.length}個のタグ候補を承認し、第2段階の準備が完了しました`, 'success');
+        }
+
+        async function executeStage2() {
+            if (!approvedCandidates.length) {
+                showStatus('承認されたタグ候補がありません', 'danger');
+                return;
+            }
+
+            showLoading('第2段階: 個別動画を分析中...');
+            document.getElementById('stage2Btn').disabled = true;
+
+            try {
+                const aiEngine = document.getElementById('aiEngine').value;
+                const response = await fetch('/api/ai/stage2', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: currentData,
+                        approved_candidates: approvedCandidates,
+                        ai_engine: aiEngine
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    stage2Results = result;
+                    displayResults(result);
+                    showStatus(`✅ ${result.results.length}件の動画タグ付けが完了しました`, 'success');
+                    document.getElementById('resultsCard').classList.remove('hidden');
+                    document.getElementById('stage2-indicator').classList.add('completed');
+                } else {
+                    showStatus(`❌ 第2段階エラー: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                showStatus(`❌ 接続エラー: ${error.message}`, 'danger');
+            } finally {
+                document.getElementById('stage2Btn').disabled = false;
+            }
+        }
+
+        function displayResults(result) {
+            const statsDiv = document.getElementById('resultsStats');
+            const container = document.getElementById('resultsContainer');
+            
+            const stats = result.statistics;
+            statsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>📊 処理統計:</strong><br>
+                    総動画数: ${stats.total_videos}件 | 
+                    平均タグ数: ${stats.avg_tags_per_video.toFixed(1)}個/動画 | 
+                    総タグ数: ${stats.total_tags_assigned}個 | 
+                    処理時間: ${stats.processing_time.toFixed(2)}秒
+                </div>
+            `;
+            
+            container.innerHTML = result.results.map(item => `
+                <div class="result-item">
+                    <div class="result-title">${item.title.substring(0, 50)}...</div>
+                    <div style="margin: 10px 0; font-size: 12px; color: #ddd;">
+                        タグ数: ${item.tag_count} | 信頼度: ${(item.confidence * 100).toFixed(0)}%
+                    </div>
+                    <div class="result-tags">
+                        ${item.selected_tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function exportResults() {
+            if (!stage2Results) return;
+            
+            const data = stage2Results.results.map(item => ({
+                title: item.title,
+                tags: item.selected_tags.join(', '),
+                tag_count: item.tag_count,
+                confidence: item.confidence
+            }));
+            
+            const csv = [
+                ['Title', 'Tags', 'Tag Count', 'Confidence'],
+                ...data.map(row => [row.title, row.tags, row.tag_count, row.confidence])
+            ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `tag_results_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+
+        function resetSystem() {
+            currentData = [];
+            stage1Results = null;
+            stage2Results = null;
+            approvedCandidates = [];
+            
+            // UI リセット
+            document.getElementById('stage1Card').classList.add('hidden');
+            document.getElementById('stage2Card').classList.add('hidden');
+            document.getElementById('resultsCard').classList.add('hidden');
+            document.getElementById('candidatesSection').classList.add('hidden');
+            document.getElementById('statusPanel').classList.add('hidden');
+            
+            // インジケーター リセット
+            document.getElementById('stage1-indicator').className = 'stage active';
+            document.getElementById('stage2-indicator').className = 'stage';
+            
+            // フォーム リセット
+            document.getElementById('sheetsUrl').value = '';
+            
+            showStatus('システムがリセットされました。新しい処理を開始できます。', 'info');
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            showStatus('段階分離式タグ処理システムです。データを読み込んで開始してください。', 'info');
+        });
+    </script>
+</body>
+</html>

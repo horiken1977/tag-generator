@@ -45,8 +45,14 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
     
     def serve_webapp(self):
         try:
-            # Try API version first
-            filename = 'webapp_api.html' if os.path.exists('webapp_api.html') else 'webapp.html'
+            # 段階分離式を優先、次にAPI版、最後に通常版
+            if os.path.exists('webapp_staged.html'):
+                filename = 'webapp_staged.html'
+            elif os.path.exists('webapp_api.html'):
+                filename = 'webapp_api.html'
+            else:
+                filename = 'webapp.html'
+            
             with open(filename, 'r', encoding='utf-8') as f:
                 content = f.read()
             self.send_response(200)
@@ -54,6 +60,8 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_cors_headers()
             self.end_headers()
             self.wfile.write(content.encode('utf-8'))
+            
+            print(f"使用中のWebアプリ: {filename}")
         except FileNotFoundError:
             self.send_error(404)
     
@@ -101,6 +109,10 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_sheets_data(data)
             elif self.path == '/api/ai/process':
                 self.handle_ai_process(data)
+            elif self.path == '/api/ai/stage1':
+                self.handle_stage1_candidate_generation(data)
+            elif self.path == '/api/ai/stage2':
+                self.handle_stage2_individual_tagging(data)
             elif self.path == '/api/tags/optimize':
                 self.handle_tag_optimize(data)
             else:
@@ -231,12 +243,21 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         print(f"Processing {len(video_data)} videos with AI engine: {ai_engine}")
         print(f"Two-phase processing: {'ENABLED' if use_two_phase else 'DISABLED'}")
         
-        if use_two_phase and len(video_data) > 1:
-            # Use two-phase processing for batch operations
-            return self.handle_two_phase_processing(video_data, ai_engine, use_real_ai)
-        else:
-            # Use original single-phase processing for single videos or when disabled
-            return self.handle_single_phase_processing(video_data, ai_engine, use_real_ai)
+        # 段階分離式処理が利用可能な場合は推奨
+        if len(video_data) > 1:
+            self.send_json_response({
+                'success': False,
+                'message': '段階分離式処理を使用してください',
+                'recommendation': {
+                    'step1': 'POST /api/ai/stage1 でタグ候補を生成',
+                    'step2': 'タグ候補を確認・承認後、POST /api/ai/stage2 で個別タグ付け'
+                },
+                'fallback_available': True
+            })
+            return
+        
+        # 単一動画の場合は従来処理
+        return self.handle_single_phase_processing(video_data, ai_engine, use_real_ai)
     
     def handle_two_phase_processing(self, video_data, ai_engine, use_real_ai):
         """正しい二段階タグ処理（ユーザー要求仕様完全準拠）"""
@@ -313,6 +334,80 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
                 'success': False,
                 'error': f'二段階処理に失敗しました: {str(e)}',
                 'fallback_used': False
+            }, 500)
+    
+    def handle_stage1_candidate_generation(self, data):
+        """第1段階: タグ候補生成（文字起こし除外）"""
+        from staged_tag_processor import StagedTagProcessor
+        
+        video_data = data.get('data', [])
+        
+        if not video_data:
+            self.send_json_response({
+                'success': False,
+                'error': '動画データがありません'
+            }, 400)
+            return
+        
+        print(f"\n第1段階処理開始: {len(video_data)}件の動画")
+        
+        processor = StagedTagProcessor(ai_handler if AI_ENABLED else None)
+        
+        try:
+            result = processor.execute_stage1_candidate_generation(video_data)
+            self.send_json_response(result)
+            
+        except Exception as e:
+            print(f"第1段階処理エラー: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            self.send_json_response({
+                'success': False,
+                'error': f'第1段階処理に失敗しました: {str(e)}',
+                'stage': 1
+            }, 500)
+    
+    def handle_stage2_individual_tagging(self, data):
+        """第2段階: 個別タグ付け（文字起こし含む）"""
+        from staged_tag_processor import StagedTagProcessor
+        
+        video_data = data.get('data', [])
+        approved_candidates = data.get('approved_candidates', [])
+        ai_engine = data.get('ai_engine', 'openai')
+        
+        if not video_data:
+            self.send_json_response({
+                'success': False,
+                'error': '動画データがありません'
+            }, 400)
+            return
+        
+        if not approved_candidates:
+            self.send_json_response({
+                'success': False,
+                'error': '承認されたタグ候補がありません',
+                'message': 'まず /api/ai/stage1 でタグ候補を生成し、内容を確認してから第2段階を実行してください'
+            }, 400)
+            return
+        
+        print(f"\n第2段階処理開始: {len(video_data)}件の動画、{len(approved_candidates)}個のタグ候補使用")
+        
+        processor = StagedTagProcessor(ai_handler if AI_ENABLED else None)
+        
+        try:
+            result = processor.execute_stage2_individual_tagging(video_data, approved_candidates, ai_engine)
+            self.send_json_response(result)
+            
+        except Exception as e:
+            print(f"第2段階処理エラー: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            self.send_json_response({
+                'success': False,
+                'error': f'第2段階処理に失敗しました: {str(e)}',
+                'stage': 2
             }, 500)
     
     def handle_single_phase_processing(self, video_data, ai_engine, use_real_ai):
