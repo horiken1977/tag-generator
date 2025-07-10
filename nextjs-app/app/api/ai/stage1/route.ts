@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AIClient } from '@/lib/ai-client'
 
 interface VideoData {
   title?: string
@@ -69,8 +70,26 @@ export async function POST(request: NextRequest) {
       ...allSummaries
     ].join(' ')
 
-    // キーワード抽出
-    let keywords = extractKeywords(allText)
+    // AI API使用可能かチェック
+    const useAI = process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY
+    let keywords: string[] = []
+
+    if (useAI) {
+      // AI APIでタグ生成
+      try {
+        const aiClient = new AIClient()
+        const aiEngine = process.env.OPENAI_API_KEY ? 'openai' : 
+                       process.env.CLAUDE_API_KEY ? 'claude' : 'gemini'
+        keywords = await aiClient.generateTags(allText, aiEngine)
+        console.log(`AI生成完了 (${aiEngine}): ${keywords.length}個のタグ`)
+      } catch (error) {
+        console.error('AI生成失敗、フォールバック:', error)
+        keywords = extractKeywords(allText)
+      }
+    } else {
+      // フォールバック: キーワード抽出
+      keywords = extractKeywords(allText)
+    }
 
     // 既知の重要キーワードを追加
     const importantKeywords = [

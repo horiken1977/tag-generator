@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 
 interface VideoData {
@@ -49,10 +49,26 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState({ message: '', type: 'info' })
   const [currentStage, setCurrentStage] = useState(0)
+  const [systemStatus, setSystemStatus] = useState<any>(null)
 
   const showStatus = (message: string, type: 'info' | 'success' | 'danger' = 'info') => {
     setStatus({ message, type })
   }
+
+  const checkSystemStatus = async () => {
+    try {
+      const response = await axios.get('/api/status')
+      setSystemStatus(response.data)
+      setAiEngine(response.data.default_engine || 'openai')
+    } catch (error) {
+      console.error('Status check failed:', error)
+    }
+  }
+
+  // コンポーネント読み込み時にシステム状態をチェック
+  useEffect(() => {
+    checkSystemStatus()
+  }, [])
 
   const loadSheetData = async () => {
     if (!sheetsUrl) {
@@ -223,6 +239,18 @@ export default function Home() {
       <div className="text-center mb-10">
         <h1 className="text-5xl font-bold mb-2 drop-shadow-lg">🏷️ Tag Generator</h1>
         <p className="text-xl">段階分離式タグ処理システム</p>
+        {systemStatus && (
+          <div className="mt-4 p-3 bg-white/10 rounded-lg">
+            <p className="text-sm">
+              🤖 AI: {systemStatus.available_engines.length > 0 ? 
+                `${systemStatus.available_engines.join(', ')} 利用可能` : 
+                'フォールバックモード'
+              } | 
+              🌐 Platform: Vercel | 
+              📅 Version: {systemStatus.version}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ステージインジケーター */}
@@ -278,9 +306,18 @@ export default function Home() {
               onChange={(e) => setAiEngine(e.target.value)}
               className="w-full p-3 rounded-lg bg-white/90 text-gray-800"
             >
-              <option value="openai">OpenAI (GPT-3.5)</option>
-              <option value="claude">Claude</option>
-              <option value="gemini">Gemini</option>
+              {systemStatus?.available_engines?.includes('openai') && (
+                <option value="openai">OpenAI (GPT-3.5)</option>
+              )}
+              {systemStatus?.available_engines?.includes('claude') && (
+                <option value="claude">Claude</option>
+              )}
+              {systemStatus?.available_engines?.includes('gemini') && (
+                <option value="gemini">Gemini</option>
+              )}
+              {!systemStatus?.available_engines?.length && (
+                <option value="fallback">フォールバックモード（キーワード抽出）</option>
+              )}
             </select>
           </div>
           <div className="flex gap-3">
