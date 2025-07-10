@@ -1,4 +1,9 @@
 <?php
+// エラーログを有効化
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
+ini_set('error_log', 'api_proxy_error.log');
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -7,6 +12,9 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
+
+// デバッグログ
+file_put_contents('api_proxy_debug.log', date('Y-m-d H:i:s') . " - Request: " . $_SERVER['REQUEST_METHOD'] . " " . ($_GET['path'] ?? 'NO_PATH') . "\n", FILE_APPEND);
 
 $api_base = 'http://localhost:8080';
 $path = $_GET['path'] ?? '';
@@ -23,7 +31,8 @@ if ($method === 'POST') {
             'method' => $method,
             'header' => implode("\r\n", $headers),
             'content' => $postData,
-            'timeout' => 30
+            'timeout' => 120,  // タイムアウトを120秒に延長
+            'ignore_errors' => true
         ]
     ]);
 } else {
@@ -31,7 +40,8 @@ if ($method === 'POST') {
         'http' => [
             'method' => $method,
             'header' => implode("\r\n", $headers),
-            'timeout' => 30
+            'timeout' => 120,  // タイムアウトを120秒に延長
+            'ignore_errors' => true
         ]
     ]);
 }

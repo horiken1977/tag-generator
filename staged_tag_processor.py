@@ -21,7 +21,7 @@ class StagedTagProcessor:
         self.stage1_candidates = set()
         self.approved_candidates = set()
         
-    def execute_stage1_candidate_generation(self, all_video_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def execute_stage1_candidate_generation(self, all_video_data: List[Dict[str, Any]], max_batch_size: int = 50) -> Dict[str, Any]:
         """
         第1段階: 文字起こし除外での全件分析とタグ候補生成
         
@@ -31,6 +31,11 @@ class StagedTagProcessor:
         Returns:
             stage1結果（タグ候補、統計情報等）
         """
+        # 高負荷対策: バッチサイズ制限
+        if len(all_video_data) > max_batch_size:
+            print(f"⚠️ 高負荷対策: {len(all_video_data)}件 → 最初の{max_batch_size}件のみ処理")
+            all_video_data = all_video_data[:max_batch_size]
+        
         print(f"\n{'='*60}")
         print(f"第1段階開始: タグ候補生成（文字起こし除外分析）")
         print(f"対象動画数: {len(all_video_data)}件")
@@ -198,21 +203,30 @@ class StagedTagProcessor:
     def _generate_candidates_with_ai(self, aggregated_data: Dict[str, str]) -> List[str]:
         """AI分析でタグ候補を生成"""
         
+        # 高負荷対策: テキスト長制限でプロンプトサイズを削減
+        all_titles_text = aggregated_data['all_titles'][:2000] if aggregated_data['all_titles'] else ''
+        all_skills_text = aggregated_data['all_skills'][:1000] if aggregated_data['all_skills'] else ''
+        all_descriptions_text = aggregated_data['all_descriptions'][:3000] if aggregated_data['all_descriptions'] else ''
+        all_summaries_text = aggregated_data['all_summaries'][:3000] if aggregated_data['all_summaries'] else ''
+        
+        # プロンプトサイズ削減ログ
+        print(f"  テキスト長制限: タイトル{len(all_titles_text)}, スキル{len(all_skills_text)}, 説明{len(all_descriptions_text)}, 要約{len(all_summaries_text)}")
+        
         prompt = f"""
 以下の全動画データを分析して、タグ候補となるキーワードを抽出してください。
 これらは後で個別動画の詳細分析で使用される候補です。
 
 【全タイトル集約】:
-{aggregated_data['all_titles']}
+{all_titles_text}
 
 【全スキル集約】:
-{aggregated_data['all_skills']}
+{all_skills_text}
 
 【全説明文集約】:
-{aggregated_data['all_descriptions']}
+{all_descriptions_text}
 
 【全要約集約】:
-{aggregated_data['all_summaries']}
+{all_summaries_text}
 
 【タグ候補抽出の基準】:
 1. 具体的なツール名・サービス名・手法名
