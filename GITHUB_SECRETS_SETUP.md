@@ -6,46 +6,65 @@ Vercel自動デプロイのためのGitHub Secrets設定方法
 
 以下のSecretsをGitHubリポジトリに設定してください：
 
-### 1. VERCEL_TOKEN
+### 1. VERCEL_TOKEN 🔑
 **取得方法：**
-1. Vercelダッシュボード → Settings → Tokens
+1. [Vercel Settings → Tokens](https://vercel.com/account/tokens)
 2. 「Create Token」をクリック
-3. 名前を入力（例: `github-actions`）
-4. Scopeを選択: `Full Account`
-5. トークンをコピー
+3. 名前: `github-actions-deploy`
+4. Scope: `Full Account`
+5. Expiration: `No Expiration` (推奨)
+6. 🔗 **トークンをコピー**（再表示されません）
 
-### 2. VERCEL_ORG_ID
+### 2. VERCEL_ORG_ID 🏢
 **取得方法：**
-1. ローカルでVercel CLIインストール: `npm i -g vercel`
-2. プロジェクトディレクトリで: `vercel link`
-3. `.vercel/project.json`ファイルを確認
-4. `orgId`をコピー
+1. [Vercel Team Settings](https://vercel.com/teams)
+2. Team ID をコピー
+3. または、ローカルで：
+   ```bash
+   npx vercel whoami
+   ```
 
-### 3. VERCEL_PROJECT_ID
+### 3. VERCEL_PROJECT_ID 📋
 **取得方法：**
-1. 上記と同じ`.vercel/project.json`ファイル
-2. `projectId`をコピー
+1. Vercelプロジェクト → Settings → General
+2. Project IDをコピー
+3. または、プロジェクトURL最後の部分
+   - URL: `https://vercel.com/user/project-name`
+   - Project ID: `project-name`
 
 ## ⚙️ GitHub Secrets設定手順
 
 ### 1. GitHubリポジトリにアクセス
 ```
-https://github.com/horiken1977/tag-generator
+https://github.com/horiken1977/tag-generator/settings/secrets/actions
 ```
 
-### 2. Settings → Secrets and variables → Actions
+### 2. 「New repository secret」で以下を順番に追加:
 
-### 3. 「New repository secret」で以下を追加:
-
+#### Secret 1: VERCEL_TOKEN
 ```
-名前: VERCEL_TOKEN
-値: [Vercelから取得したトークン]
+Name: VERCEL_TOKEN
+Secret: vercel_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-名前: VERCEL_ORG_ID  
-値: [.vercel/project.jsonのorgId]
+#### Secret 2: VERCEL_ORG_ID
+```
+Name: VERCEL_ORG_ID
+Secret: team_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-名前: VERCEL_PROJECT_ID
-値: [.vercel/project.jsonのprojectId]
+#### Secret 3: VERCEL_PROJECT_ID
+```
+Name: VERCEL_PROJECT_ID
+Secret: prj_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 3. 設定確認
+設定後、以下が表示されれば成功：
+```
+✅ VERCEL_TOKEN        Updated now
+✅ VERCEL_ORG_ID       Updated now  
+✅ VERCEL_PROJECT_ID   Updated now
 ```
 
 ## 🔧 Vercel CLI設定方法
