@@ -284,6 +284,19 @@
         let stage1Results = null;
         let stage2Results = null;
         let approvedCandidates = [];
+        
+        // 本番環境でのAPIアクセス設定
+        const IS_PRODUCTION = window.location.hostname === 'mokumoku.sakura.ne.jp';
+        
+        function getApiUrl(endpoint) {
+            if (IS_PRODUCTION) {
+                // 本番環境ではPHPプロキシを使用
+                return `api_proxy.php?path=${encodeURIComponent(endpoint)}`;
+            } else {
+                // 開発環境では直接APIサーバーにアクセス
+                return endpoint;
+            }
+        }
 
         function showStatus(message, type = 'info') {
             const panel = document.getElementById('statusPanel');
@@ -306,7 +319,7 @@
             showLoading('データを読み込み中...');
 
             try {
-                const response = await fetch('/api/sheets/data', {
+                const response = await fetch(getApiUrl('/api/sheets/data'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: url })
@@ -356,7 +369,7 @@
             document.getElementById('stage1Btn').disabled = true;
 
             try {
-                const response = await fetch('/api/ai/stage1', {
+                const response = await fetch(getApiUrl('/api/ai/stage1'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: currentData })
@@ -449,7 +462,7 @@
 
             try {
                 const aiEngine = document.getElementById('aiEngine').value;
-                const response = await fetch('/api/ai/stage2', {
+                const response = await fetch(getApiUrl('/api/ai/stage2'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
