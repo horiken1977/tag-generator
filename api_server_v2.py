@@ -386,15 +386,77 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         elif ai_engine == 'gemini':
             base_tags.extend(['多角的視点', '創造的思考'])
         
-        # Add common business tags
-        base_tags.extend(['ビジネススキル', '職場効率', '成果向上'])
+        # Add minimal business context only if no specific tags found
+        if len(base_tags) < 3:
+            base_tags.extend(['マーケティング教育'])
         
         # Generate unique identifier based on content to ensure uniqueness
         import hashlib
         content_hash = hashlib.md5(all_content.encode()).hexdigest()[:4]
         base_tags.append(f"ID-{content_hash}")
         
-        return list(set(base_tags))[:15]  # Remove duplicates and limit
+        # Apply same filtering logic as AI handler
+        filtered_tags = self._filter_generic_tags(list(set(base_tags)))
+        
+        return filtered_tags[:15]  # Remove duplicates and limit
+    
+    def _filter_generic_tags(self, tags):
+        """Filter out generic and meaningless tags (same logic as AI handler)"""
+        if not tags:
+            return tags
+        
+        # Patterns to filter out
+        generic_patterns = [
+            # Number + の + generic noun patterns
+            r'\d+つの要素', r'\d+つの分類', r'\d+つのポイント', r'\d+つの手法',
+            r'\d+つのステップ', r'\d+つの方法', r'\d+つの技術', r'\d+つの項目',
+            r'\d+つの観点', r'\d+つの視点', r'\d+つの基準', r'\d+つの原則',
+            r'\d+個の要素', r'\d+個の分類', r'\d+個のポイント', r'\d+個の手法',
+            # Generic standalone words - Basic
+            r'^要素$', r'^分類$', r'^ポイント$', r'^手法$', r'^方法$', r'^技術$',
+            r'^基本$', r'^応用$', r'^実践$', r'^理論$', r'^概要$', r'^入門$',
+            r'^初級$', r'^中級$', r'^上級$', r'^基礎$', r'^発展$', r'^活用$',
+            # Generic business terms - Additional patterns from user feedback
+            r'^実務スキル$', r'^思考法$', r'^業界知識$', r'^ツール活用$', 
+            r'^人材育成$', r'^スキル開発$', r'^成果向上$', r'^効率化$',
+            r'^戦術$', r'^手順$', r'^方法論$', r'^支援会社視点$',
+            r'^ビジネススキル$', r'^職場効率$', r'^社会人教育$', r'^研修動画$',
+            # Generic process terms
+            r'^改善$', r'^最適化$', r'^強化$', r'^向上$', r'^推進$', r'^展開$',
+            r'^構築$', r'^確立$', r'^設計$', r'^運用$', r'^管理$', r'^分析$'
+        ]
+        
+        import re
+        filtered_tags = []
+        
+        for tag in tags:
+            tag = tag.strip()
+            if not tag:
+                continue
+                
+            # Check against generic patterns
+            is_generic = False
+            for pattern in generic_patterns:
+                if re.match(pattern, tag):
+                    is_generic = True
+                    break
+            
+            # Additional filters
+            if not is_generic:
+                # Filter overly short tags (single characters or very short)
+                if len(tag) < 2:
+                    is_generic = True
+                # Filter tags with only numbers
+                elif tag.isdigit():
+                    is_generic = True
+                # Filter tags that are just punctuation
+                elif not any(c.isalnum() for c in tag):
+                    is_generic = True
+            
+            if not is_generic:
+                filtered_tags.append(tag)
+        
+        return filtered_tags
     
     def handle_tag_optimize(self, data):
         all_tags = data.get('tags', [])

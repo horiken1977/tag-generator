@@ -78,16 +78,86 @@ class AIAPIHandler:
 6. 文字起こし内容から読み取れる具体的な手法やポイント
 7. 実際に話されている事例やケーススタディ
 
-重要な注意事項:
-1. 文字起こし内容を十分に分析し、動画固有の内容を反映したタグを生成してください
-2. 同じタイトルでも文字起こし内容が異なれば、必ず異なるタグを生成してください
-3. 汎用的すぎるタグ（「6つの要素」「8つの分類」「4つのポイント」など）は避けてください
-4. 具体的な手法名、ツール名、専門用語を文字起こしから抽出してタグに含めてください
-5. 数字を含むタグは、その数字が動画の具体的な内容と関連している場合のみ使用してください
+【絶対に守るべき厳格なルール】:
+1. 文字起こし内容を最優先で分析し、そこから具体的なキーワードを抽出すること
+2. 同じタイトルでも文字起こし内容が異なれば、必ず異なるタグセットを生成すること
+3. 以下のような汎用的すぎるタグは絶対に生成禁止：
+   - 「6つの要素」「8つの分類」「4つのポイント」「3つの手法」等の数字+汎用名詞
+   - 「要素」「分類」「ポイント」「手法」「方法」「技術」等の単体使用
+   - 「基本」「応用」「実践」「理論」「概要」「入門」等の抽象的レベル表現
+4. 必須要件：文字起こしから具体的な以下を抽出してタグ化：
+   - 実際に言及された企業名・サービス名・ツール名
+   - 具体的な数値や指標名（ROI、CPA、CTR等）
+   - 専門的な手法や理論の正式名称
+   - 実際に説明された実務プロセスや業務フロー
+5. 文字起こし内容の独自性を必ず反映：同一タイトルでも内容が違えば全く違うタグにする
 
-タグのみをカンマ区切りで出力してください。
+出力：具体的で検索価値の高いタグのみをカンマ区切りで出力。汎用的な単語は一切含めない。
 """
     
+    def filter_generic_tags(self, tags):
+        """Filter out generic and meaningless tags"""
+        if not tags:
+            return tags
+        
+        # Patterns to filter out
+        generic_patterns = [
+            # Number + の + generic noun patterns
+            r'\d+つの要素', r'\d+つの分類', r'\d+つのポイント', r'\d+つの手法',
+            r'\d+つのステップ', r'\d+つの方法', r'\d+つの技術', r'\d+つの項目',
+            r'\d+つの観点', r'\d+つの視点', r'\d+つの基準', r'\d+つの原則',
+            r'\d+個の要素', r'\d+個の分類', r'\d+個のポイント', r'\d+個の手法',
+            # Generic standalone words - Basic
+            r'^要素$', r'^分類$', r'^ポイント$', r'^手法$', r'^方法$', r'^技術$',
+            r'^基本$', r'^応用$', r'^実践$', r'^理論$', r'^概要$', r'^入門$',
+            r'^初級$', r'^中級$', r'^上級$', r'^基礎$', r'^発展$', r'^活用$',
+            # Generic business terms - Additional patterns from user feedback
+            r'^実務スキル$', r'^思考法$', r'^業界知識$', r'^ツール活用$', 
+            r'^人材育成$', r'^スキル開発$', r'^成果向上$', r'^効率化$',
+            r'^戦術$', r'^手順$', r'^方法論$', r'^支援会社視点$',
+            r'^ビジネススキル$', r'^職場効率$', r'^社会人教育$', r'^研修動画$',
+            # Generic process terms
+            r'^改善$', r'^最適化$', r'^強化$', r'^向上$', r'^推進$', r'^展開$',
+            r'^構築$', r'^確立$', r'^設計$', r'^運用$', r'^管理$', r'^分析$'
+        ]
+        
+        import re
+        filtered_tags = []
+        
+        for tag in tags:
+            tag = tag.strip()
+            if not tag:
+                continue
+                
+            # Check against generic patterns
+            is_generic = False
+            for pattern in generic_patterns:
+                if re.match(pattern, tag):
+                    print(f"  Filtered generic tag: {tag}")
+                    is_generic = True
+                    break
+            
+            # Additional filters
+            if not is_generic:
+                # Filter overly short tags (single characters or very short)
+                if len(tag) < 2:
+                    print(f"  Filtered short tag: {tag}")
+                    is_generic = True
+                # Filter tags with only numbers
+                elif tag.isdigit():
+                    print(f"  Filtered numeric tag: {tag}")
+                    is_generic = True
+                # Filter tags that are just punctuation
+                elif not any(c.isalnum() for c in tag):
+                    print(f"  Filtered punctuation tag: {tag}")
+                    is_generic = True
+            
+            if not is_generic:
+                filtered_tags.append(tag)
+        
+        print(f"  Tag filtering: {len(tags)} -> {len(filtered_tags)} tags")
+        return filtered_tags
+
     def call_openai(self, prompt):
         """Call OpenAI API"""
         if 'OPENAI_API_KEY' not in self.api_keys or not self.api_keys['OPENAI_API_KEY']:
@@ -102,10 +172,10 @@ class AIAPIHandler:
         data = {
             'model': 'gpt-3.5-turbo',
             'messages': [
-                {'role': 'system', 'content': 'あなたは教育コンテンツのタグ付け専門家です。動画の内容を分析して、検索性が高く実用的な日本語タグを生成してください。'},
+                {'role': 'system', 'content': 'あなたは教育コンテンツのタグ付け専門家です。文字起こし内容を詳細に分析し、その動画固有の具体的なキーワードのみをタグとして抽出してください。汎用的な表現（「要素」「手法」「ポイント」「基本」「応用」等）や数字を含む汎用表現（「6つの要素」等）は絶対に生成しないでください。文字起こしから実際に言及された企業名、ツール名、専門用語、具体的な指標名のみを抽出してください。'},
                 {'role': 'user', 'content': prompt}
             ],
-            'temperature': 0.7,
+            'temperature': 0.5,  # Reduced for more consistent results
             'max_tokens': 300  # Increased for more comprehensive tags
         }
         
@@ -132,8 +202,11 @@ class AIAPIHandler:
                         if clean_tag and len(clean_tag) > 0:
                             cleaned_tags.append(clean_tag)
                     
-                    print(f"OpenAI generated {len(cleaned_tags)} tags")
-                    return cleaned_tags[:20]  # Limit to 20 tags
+                    # Apply generic tag filtering
+                    filtered_tags = self.filter_generic_tags(cleaned_tags)
+                    
+                    print(f"OpenAI generated {len(filtered_tags)} filtered tags")
+                    return filtered_tags[:20]  # Limit to 20 tags
                 else:
                     print(f"OpenAI API returned status: {response.getcode()}")
                     return None
@@ -190,8 +263,11 @@ class AIAPIHandler:
                         if clean_tag and len(clean_tag) > 0:
                             cleaned_tags.append(clean_tag)
                     
-                    print(f"Claude generated {len(cleaned_tags)} tags")
-                    return cleaned_tags[:20]  # Limit to 20 tags
+                    # Apply generic tag filtering
+                    filtered_tags = self.filter_generic_tags(cleaned_tags)
+                    
+                    print(f"Claude generated {len(filtered_tags)} filtered tags")
+                    return filtered_tags[:20]  # Limit to 20 tags
                 else:
                     print(f"Claude API returned status: {response.getcode()}")
                     return None
@@ -256,8 +332,11 @@ class AIAPIHandler:
                                 if clean_tag and len(clean_tag) > 0:
                                     cleaned_tags.append(clean_tag)
                             
-                            print(f"Gemini generated {len(cleaned_tags)} tags")
-                            return cleaned_tags[:20]  # Limit to 20 tags
+                            # Apply generic tag filtering
+                            filtered_tags = self.filter_generic_tags(cleaned_tags)
+                            
+                            print(f"Gemini generated {len(filtered_tags)} filtered tags")
+                            return filtered_tags[:20]  # Limit to 20 tags
                     
                     print("Gemini API returned unexpected response structure")
                     return None
@@ -304,77 +383,68 @@ class AIAPIHandler:
         # Combine all content for comprehensive analysis
         all_content = f"{title} {skill} {description} {summary} {transcript}".lower()
         
-        # Enhanced keyword extraction with transcript analysis
-        keywords = {
-            'マーケティング': ['マーケティング', 'デジタルマーケティング', 'マーケティング戦略'],
-            'プレゼン': ['プレゼンテーション', 'プレゼンスキル', '発表技法'],
-            'リーダー': ['リーダーシップ', 'マネジメント', 'チームリーダー'],
-            'コミュニケーション': ['コミュニケーション', '対人スキル', 'ビジネスコミュニケーション'],
-            'データ': ['データ分析', 'データ活用', 'ビジネス分析'],
-            'デジタル': ['デジタル化', 'DX', 'デジタルトランスフォーメーション'],
-            'セールス': ['営業', 'セールス', '販売', '営業戦略'],
-            '戦略': ['戦略立案', '企画', 'プランニング', '戦略思考'],
-            '効率': ['効率化', '生産性向上', '時間管理', 'パフォーマンス'],
-            '問題': ['問題解決', '課題解決', 'トラブルシューティング'],
-            '顧客': ['顧客満足', 'CS', '顧客体験', 'CX', '顧客対応'],
-            '品質': ['品質管理', 'QC', '改善', 'カイゼン']
-        }
+        # Extract specific keywords from transcript content (avoiding generic terms)
+        specific_keywords = {}
         
-        # Apply keyword matching to all content
-        for key, values in keywords.items():
-            if key in all_content:
-                tags.extend(values)
+        # Only include if transcript contains specific, concrete terms
+        if 'Instagram' in all_content or 'TikTok' in all_content or 'YouTube' in all_content:
+            specific_keywords['SNS'] = ['Instagram', 'TikTok', 'YouTube', 'SNSマーケティング']
+        if 'Google Analytics' in all_content or 'Salesforce' in all_content:
+            specific_keywords['ツール'] = ['Google Analytics', 'Salesforce', 'マーケティングツール']
+        if 'ROI' in all_content or 'CPA' in all_content or 'CTR' in all_content:
+            specific_keywords['指標'] = ['ROI', 'CPA', 'CTR', 'マーケティング指標']
+        if 'PDCA' in all_content:
+            specific_keywords['フレームワーク'] = ['PDCAサイクル', 'PDCA']
+        if '財務諸表' in all_content or '損益計算書' in all_content:
+            specific_keywords['財務'] = ['財務諸表', '損益計算書', '貸借対照表']
         
-        # Transcript-specific analysis for detailed content
+        # Apply specific keyword matching to content
+        for key, values in specific_keywords.items():
+            tags.extend(values)
+        
+        # Extract only very specific terms from transcript
         if transcript:
-            # Extract specific business concepts from transcript
-            transcript_keywords = {
-                '売上': ['売上向上', '収益改善', '業績向上'],
-                '収益': ['収益改善', '利益向上', '売上向上'],
-                '改善': ['業務改善', 'プロセス改善', '継続改善'],
-                '分析': ['分析手法', 'データドリブン', '定量分析', '分析力'],
-                '企画': ['企画立案', '企画力', 'プロジェクト企画'],
-                'コスト': ['コスト削減', 'コスト管理', '効率化'],
-                '組織': ['組織運営', '組織開発', 'チームビルディング'],
-                '目標': ['目標設定', '目標管理', 'KPI管理'],
-                '交渉': ['交渉術', '交渉力', 'ネゴシエーション'],
-                '提案': ['提案力', 'プレゼンテーション', '企画提案'],
-                '研修': ['人材育成', '教育', 'スキルアップ'],
-                'イノベーション': ['創造性', 'イノベーション', '新規事業'],
-                'プロジェクト': ['プロジェクト管理', 'PM', 'プロジェクトマネジメント']
-            }
+            # Only extract concrete, specific terms that are mentioned
+            specific_terms = []
             
-            for keyword, related_tags in transcript_keywords.items():
-                if keyword in transcript:
-                    tags.extend(related_tags)
+            # Extract specific tool/platform names mentioned
+            tools = ['Google Analytics', 'Salesforce', 'Facebook', 'Instagram', 'TikTok', 'YouTube', 'Twitter', 'LinkedIn']
+            for tool in tools:
+                if tool.lower() in transcript:
+                    specific_terms.append(tool)
+            
+            # Extract specific metrics mentioned  
+            metrics = ['ROI', 'CPA', 'CPM', 'CTR', 'LTV', 'CAC', 'ROAS']
+            for metric in metrics:
+                if metric in transcript:
+                    specific_terms.append(metric)
+            
+            # Extract specific methodologies mentioned
+            methods = ['A/Bテスト', 'PDCAサイクル', 'KPI', 'OKR', 'アジャイル', 'リーンスタートアップ']
+            for method in methods:
+                if method in transcript:
+                    specific_terms.append(method)
+            
+            tags.extend(specific_terms)
         
-        # Add skill-based tags with enhanced mapping
-        skill_mappings = {
-            'コミュニケーション': ['コミュニケーション', '対人スキル', '説得力', '傾聴'],
-            'マネジメント': ['マネジメント', 'プロジェクト管理', '目標設定', '人材育成'],
-            'リーダーシップ': ['リーダーシップ', 'チームビルディング', '組織運営'],
-            'マーケティング': ['マーケティング戦略', 'マーケット分析', 'ブランド戦略'],
-            'セールス': ['営業スキル', 'セールステクニック', '商談力']
-        }
-        
-        for skill_key, skill_tags in skill_mappings.items():
-            if skill_key in skill:
-                tags.extend(skill_tags)
-        
-        # Add skill as-is if provided
-        if skill:
+        # Add only the skill category itself (avoid generic compound terms)
+        if skill and len(skill) > 1:
             tags.append(skill)
-            tags.append(f"{skill}スキル")
         
-        # Add common business tags
-        tags.extend(['ビジネススキル', '社会人教育', '研修動画'])
+        # Add minimal specific tags only if no other tags found
+        if len(tags) < 3:
+            tags.extend(['マーケティング教育', 'ビジネス研修'])
         
         # Generate content-based unique identifier to ensure different content gets different tags
         import hashlib
         content_hash = hashlib.md5(all_content.encode()).hexdigest()[:6]
         tags.append(f"Content-{content_hash}")
         
-        return list(set(tags))[:20]  # Remove duplicates and expand limit
+        # Apply the same filtering as AI-generated tags
+        unique_tags = list(set(tags))
+        filtered_tags = self.filter_generic_tags(unique_tags)
+        
+        return filtered_tags[:20]  # Remove duplicates and expand limit
 
 # Integration with API server
 def integrate_with_api_server():
