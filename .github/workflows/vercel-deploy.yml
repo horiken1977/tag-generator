@@ -3,13 +3,8 @@ name: 🚀 Deploy to Vercel
 on:
   push:
     branches: [ main, master ]
-    paths:
-      - 'nextjs-app/**'
-      - '.github/workflows/vercel-deploy.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'nextjs-app/**'
   workflow_dispatch:
 
 env:
@@ -28,8 +23,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: nextjs-app/package-lock.json
     
     - name: 🔧 Install Vercel CLI
       run: npm install --global vercel@latest
@@ -48,7 +41,7 @@ jobs:
       run: |
         vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        echo "PREVIEW_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})" >> $GITHUB_ENV
+        vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
     
     - name: 🌟 Deploy to Vercel (Production)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -56,34 +49,7 @@ jobs:
       run: |
         vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        echo "PRODUCTION_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> $GITHUB_ENV
-    
-    - name: 📝 Comment Preview URL
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `
-            ## 🚀 Preview Deployment
-            
-            ✅ Preview deployment successful!
-            
-            📱 **Preview URL**: ${process.env.PREVIEW_URL}
-            
-            🔧 **Build Info**:
-            - Framework: Next.js 14
-            - Commit: ${context.sha.substring(0, 7)}
-            - Branch: ${context.ref}
-            
-            ---
-            
-            プレビュー環境でタグ生成システムをテストできます。
-            `
-          })
+        vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
     
     - name: 📊 Deployment Summary
       if: always()
@@ -93,9 +59,5 @@ jobs:
         echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ github.event_name }}" == "pull_request" ]; then
-          echo "- **Preview URL**: $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-          echo "- **Production URL**: $PRODUCTION_URL" >> $GITHUB_STEP_SUMMARY
-        fi
         echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Framework**: Next.js 14 with AI Integration" >> $GITHUB_STEP_SUMMARY

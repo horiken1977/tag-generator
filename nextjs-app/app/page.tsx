@@ -238,7 +238,7 @@ export default function Home() {
     <div className="container mx-auto max-w-7xl p-5">
       <div className="text-center mb-10">
         <h1 className="text-5xl font-bold mb-2 drop-shadow-lg">🏷️ Tag Generator</h1>
-        <p className="text-xl">段階分離式タグ処理システム</p>
+        <p className="text-xl">段階分離式タグ処理システム v3.0</p>
         {systemStatus && (
           <div className="mt-4 p-3 bg-white/10 rounded-lg">
             <p className="text-sm">
