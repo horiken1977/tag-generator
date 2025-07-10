@@ -214,39 +214,83 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
         # Process with AI
         processed_tags = []
         total_processing_time = 0
+        success_count = 0
+        fallback_count = 0
         
-        for video in video_data:
+        print(f"Processing {len(video_data)} videos with AI engine: {ai_engine}")
+        print(f"AI_ENABLED: {AI_ENABLED}, use_real_ai: {use_real_ai}")
+        
+        for i, video in enumerate(video_data):
             start_time = datetime.now()
+            tags = None
+            ai_mode = 'simulation'
             
             if AI_ENABLED and use_real_ai:
-                # Use real AI API
+                # Try real AI API first
                 try:
+                    print(f"Processing video {i+1}/{len(video_data)}: {video.get('title', 'Unknown')[:50]}...")
                     tags = ai_handler.generate_tags(video, ai_engine)
+                    if tags and len(tags) > 0:
+                        ai_mode = 'real_ai'
+                        success_count += 1
+                        print(f"  ✓ AI generated {len(tags)} tags")
+                    else:
+                        print(f"  ⚠ AI returned no tags, falling back to simulation")
+                        tags = None
                 except Exception as e:
-                    print(f"AI processing error: {e}")
-                    # Fallback to simulation
-                    tags = self.generate_sample_tags(video, ai_engine)
-            else:
-                # Use simulation
+                    print(f"  ✗ AI processing error: {str(e)}")
+                    tags = None
+            
+            # Fallback to simulation if AI failed or not enabled
+            if not tags:
+                print(f"  → Using enhanced simulation mode")
                 tags = self.generate_sample_tags(video, ai_engine)
+                ai_mode = 'simulation'
+                fallback_count += 1
+            
+            # Ensure we have tags
+            if not tags:
+                tags = ['タグ生成エラー', 'ビジネススキル', '研修動画']
+                print(f"  ⚠ Using default tags as last resort")
             
             processing_time = (datetime.now() - start_time).total_seconds()
             total_processing_time += processing_time
             
+            # Calculate confidence based on source and tag count
+            if ai_mode == 'real_ai':
+                confidence = min(0.95, 0.85 + (len(tags) * 0.01))
+            else:
+                confidence = min(0.80, 0.65 + (len(tags) * 0.01))
+            
             processed_tags.append({
                 'title': video.get('title', ''),
                 'generated_tags': tags,
-                'confidence': 0.85 + (len(tags) * 0.01),
-                'processing_time': processing_time
+                'confidence': confidence,
+                'processing_time': processing_time,
+                'ai_mode': ai_mode
             })
+        
+        # Calculate overall statistics
+        total_tags = sum(len(item['generated_tags']) for item in processed_tags)
+        avg_processing_time = total_processing_time / len(video_data) if video_data else 0
+        
+        print(f"Processing complete: {success_count} AI success, {fallback_count} fallbacks")
         
         self.send_json_response({
             'success': True,
             'results': processed_tags,
-            'total_tags_generated': sum(len(item['generated_tags']) for item in processed_tags),
+            'statistics': {
+                'total_videos': len(video_data),
+                'total_tags_generated': total_tags,
+                'avg_tags_per_video': total_tags / len(video_data) if video_data else 0,
+                'ai_success_count': success_count,
+                'fallback_count': fallback_count,
+                'success_rate': (success_count / len(video_data) * 100) if video_data else 0
+            },
             'ai_engine': ai_engine,
             'processing_time': total_processing_time,
-            'ai_mode': 'real' if (AI_ENABLED and use_real_ai) else 'simulation'
+            'avg_processing_time': avg_processing_time,
+            'ai_mode': 'hybrid' if (success_count > 0 and fallback_count > 0) else ('real' if success_count > 0 else 'simulation')
         })
     
     def generate_sample_tags(self, video, ai_engine):

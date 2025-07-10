@@ -19,17 +19,39 @@ class AIAPIHandler:
         }
     
     def load_env(self):
-        """Load environment variables from .env file"""
+        """Load environment variables from .env file or OS environment"""
         self.api_keys = {}
+        
+        # Try to load from .env file first
         try:
-            with open('.env', 'r') as f:
+            with open('.env', 'r', encoding='utf-8') as f:
                 for line in f:
-                    if '=' in line:
-                        key, value = line.strip().split('=', 1)
+                    line = line.strip()
+                    if '=' in line and not line.startswith('#'):
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")  # Remove quotes
                         if key in ['OPENAI_API_KEY', 'CLAUDE_API_KEY', 'GEMINI_API_KEY']:
-                            self.api_keys[key] = value.strip()
+                            self.api_keys[key] = value
+            print(f"Loaded {len(self.api_keys)} API keys from .env file")
         except FileNotFoundError:
-            print("Warning: .env file not found")
+            print("Warning: .env file not found, checking OS environment variables")
+        
+        # Fallback to OS environment variables
+        import os
+        for key in ['OPENAI_API_KEY', 'CLAUDE_API_KEY', 'GEMINI_API_KEY']:
+            if key not in self.api_keys:
+                env_value = os.getenv(key)
+                if env_value:
+                    self.api_keys[key] = env_value
+                    print(f"Loaded {key} from OS environment")
+        
+        # Debug info (without exposing actual keys)
+        available_keys = [key for key, value in self.api_keys.items() if value]
+        print(f"Available API keys: {available_keys}")
+        
+        if not available_keys:
+            print("Warning: No API keys found. Will use fallback mode.")
     
     def generate_tags_prompt(self, video_data):
         """Generate prompt for tag generation"""
@@ -64,7 +86,8 @@ class AIAPIHandler:
     
     def call_openai(self, prompt):
         """Call OpenAI API"""
-        if 'OPENAI_API_KEY' not in self.api_keys:
+        if 'OPENAI_API_KEY' not in self.api_keys or not self.api_keys['OPENAI_API_KEY']:
+            print("OpenAI API key not available")
             return None
         
         headers = {
@@ -75,31 +98,54 @@ class AIAPIHandler:
         data = {
             'model': 'gpt-3.5-turbo',
             'messages': [
-                {'role': 'system', 'content': 'あなたは教育コンテンツのタグ付け専門家です。'},
+                {'role': 'system', 'content': 'あなたは教育コンテンツのタグ付け専門家です。動画の内容を分析して、検索性が高く実用的な日本語タグを生成してください。'},
                 {'role': 'user', 'content': prompt}
             ],
             'temperature': 0.7,
-            'max_tokens': 200
+            'max_tokens': 300  # Increased for more comprehensive tags
         }
         
         try:
+            print(f"Calling OpenAI API for tag generation...")
             req = urllib.request.Request(
                 self.endpoints['openai'],
                 data=json.dumps(data).encode('utf-8'),
                 headers=headers
             )
             
-            with urllib.request.urlopen(req, timeout=30) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                content = result['choices'][0]['message']['content']
-                return [tag.strip() for tag in content.split(',')]
+            with urllib.request.urlopen(req, timeout=45) as response:  # Increased timeout
+                if response.getcode() == 200:
+                    result = json.loads(response.read().decode('utf-8'))
+                    content = result['choices'][0]['message']['content'].strip()
+                    
+                    # Parse tags from response
+                    tags = [tag.strip() for tag in content.split(',') if tag.strip()]
+                    
+                    # Clean up tags (remove quotes, extra spaces, etc.)
+                    cleaned_tags = []
+                    for tag in tags:
+                        clean_tag = tag.strip().strip('"').strip("'").strip()
+                        if clean_tag and len(clean_tag) > 0:
+                            cleaned_tags.append(clean_tag)
+                    
+                    print(f"OpenAI generated {len(cleaned_tags)} tags")
+                    return cleaned_tags[:20]  # Limit to 20 tags
+                else:
+                    print(f"OpenAI API returned status: {response.getcode()}")
+                    return None
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            print(f"OpenAI API HTTP error {e.code}: {error_body}")
+            return None
         except Exception as e:
-            print(f"OpenAI API error: {e}")
+            print(f"OpenAI API error: {str(e)}")
             return None
     
     def call_claude(self, prompt):
         """Call Claude API"""
-        if 'CLAUDE_API_KEY' not in self.api_keys:
+        if 'CLAUDE_API_KEY' not in self.api_keys or not self.api_keys['CLAUDE_API_KEY']:
+            print("Claude API key not available")
             return None
         
         headers = {
@@ -110,7 +156,7 @@ class AIAPIHandler:
         
         data = {
             'model': 'claude-3-haiku-20240307',
-            'max_tokens': 200,
+            'max_tokens': 300,  # Increased for more comprehensive tags
             'messages': [{
                 'role': 'user',
                 'content': prompt
@@ -118,23 +164,46 @@ class AIAPIHandler:
         }
         
         try:
+            print(f"Calling Claude API for tag generation...")
             req = urllib.request.Request(
                 self.endpoints['claude'],
                 data=json.dumps(data).encode('utf-8'),
                 headers=headers
             )
             
-            with urllib.request.urlopen(req, timeout=30) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                content = result['content'][0]['text']
-                return [tag.strip() for tag in content.split(',')]
+            with urllib.request.urlopen(req, timeout=45) as response:  # Increased timeout
+                if response.getcode() == 200:
+                    result = json.loads(response.read().decode('utf-8'))
+                    content = result['content'][0]['text'].strip()
+                    
+                    # Parse tags from response
+                    tags = [tag.strip() for tag in content.split(',') if tag.strip()]
+                    
+                    # Clean up tags (remove quotes, extra spaces, etc.)
+                    cleaned_tags = []
+                    for tag in tags:
+                        clean_tag = tag.strip().strip('"').strip("'").strip()
+                        if clean_tag and len(clean_tag) > 0:
+                            cleaned_tags.append(clean_tag)
+                    
+                    print(f"Claude generated {len(cleaned_tags)} tags")
+                    return cleaned_tags[:20]  # Limit to 20 tags
+                else:
+                    print(f"Claude API returned status: {response.getcode()}")
+                    return None
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            print(f"Claude API HTTP error {e.code}: {error_body}")
+            return None
         except Exception as e:
-            print(f"Claude API error: {e}")
+            print(f"Claude API error: {str(e)}")
             return None
     
     def call_gemini(self, prompt):
         """Call Gemini API"""
-        if 'GEMINI_API_KEY' not in self.api_keys:
+        if 'GEMINI_API_KEY' not in self.api_keys or not self.api_keys['GEMINI_API_KEY']:
+            print("Gemini API key not available")
             return None
         
         url = f"{self.endpoints['gemini']}?key={self.api_keys['GEMINI_API_KEY']}"
@@ -151,23 +220,53 @@ class AIAPIHandler:
             }],
             'generationConfig': {
                 'temperature': 0.7,
-                'maxOutputTokens': 200
+                'maxOutputTokens': 300  # Increased for more comprehensive tags
             }
         }
         
         try:
+            print(f"Calling Gemini API for tag generation...")
             req = urllib.request.Request(
                 url,
                 data=json.dumps(data).encode('utf-8'),
                 headers=headers
             )
             
-            with urllib.request.urlopen(req, timeout=30) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                content = result['candidates'][0]['content']['parts'][0]['text']
-                return [tag.strip() for tag in content.split(',')]
+            with urllib.request.urlopen(req, timeout=45) as response:  # Increased timeout
+                if response.getcode() == 200:
+                    result = json.loads(response.read().decode('utf-8'))
+                    
+                    # Handle Gemini response structure
+                    if 'candidates' in result and len(result['candidates']) > 0:
+                        candidate = result['candidates'][0]
+                        if 'content' in candidate and 'parts' in candidate['content']:
+                            content = candidate['content']['parts'][0]['text'].strip()
+                            
+                            # Parse tags from response
+                            tags = [tag.strip() for tag in content.split(',') if tag.strip()]
+                            
+                            # Clean up tags (remove quotes, extra spaces, etc.)
+                            cleaned_tags = []
+                            for tag in tags:
+                                clean_tag = tag.strip().strip('"').strip("'").strip()
+                                if clean_tag and len(clean_tag) > 0:
+                                    cleaned_tags.append(clean_tag)
+                            
+                            print(f"Gemini generated {len(cleaned_tags)} tags")
+                            return cleaned_tags[:20]  # Limit to 20 tags
+                    
+                    print("Gemini API returned unexpected response structure")
+                    return None
+                else:
+                    print(f"Gemini API returned status: {response.getcode()}")
+                    return None
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            print(f"Gemini API HTTP error {e.code}: {error_body}")
+            return None
         except Exception as e:
-            print(f"Gemini API error: {e}")
+            print(f"Gemini API error: {str(e)}")
             return None
     
     def generate_tags(self, video_data, ai_engine='openai'):
