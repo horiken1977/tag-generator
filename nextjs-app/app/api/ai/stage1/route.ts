@@ -16,22 +16,38 @@ interface VideoData {
 function extractKeywords(text: string): string[] {
   const keywords: string[] = []
   
-  // 英語の大文字で始まる単語
-  const englishWords = text.match(/[A-Z][a-zA-Z]*/g) || []
+  // 英語の大文字で始まる単語（2文字以上）
+  const englishWords = text.match(/[A-Z][a-zA-Z]+/g) || []
   englishWords.forEach(word => {
-    if (word.length >= 3) keywords.push(word)
+    if (word.length >= 2) keywords.push(word)
   })
   
-  // カタカナ語
+  // 全て大文字のアクロニム（2-6文字）
+  const acronyms = text.match(/\b[A-Z]{2,6}\b/g) || []
+  acronyms.forEach(word => keywords.push(word))
+  
+  // カタカナ語（2文字以上）
   const katakanaWords = text.match(/[ァ-ヶー]+/g) || []
   katakanaWords.forEach(word => {
-    if (word.length >= 3) keywords.push(word)
+    if (word.length >= 2) keywords.push(word)
   })
   
   // 漢字2文字以上
   const kanjiWords = text.match(/[一-龯]{2,}/g) || []
   kanjiWords.forEach(word => {
-    if (word.length >= 2) keywords.push(word)
+    if (word.length >= 2 && word.length <= 8) keywords.push(word)
+  })
+  
+  // ひらがな・漢字混合の専門用語（3文字以上）
+  const mixedWords = text.match(/[ひらがな漢字]{3,}/g) || []
+  mixedWords.forEach(word => {
+    if (word.length >= 3 && word.length <= 10) keywords.push(word)
+  })
+  
+  // 英数字混合（Excel、Office365など）
+  const alphanumeric = text.match(/[A-Za-z]+\d+|[A-Za-z]*\d+[A-Za-z]+/g) || []
+  alphanumeric.forEach(word => {
+    if (word.length >= 3) keywords.push(word)
   })
   
   return keywords
@@ -59,10 +75,10 @@ export async function POST(request: NextRequest) {
     const allSummaries: string[] = []
 
     processData.forEach(video => {
-      if (video.title) allTitles.push(video.title.slice(0, 50)) // 最大50文字
-      if (video.skill) allSkills.push(video.skill.slice(0, 20))   // 最大20文字
-      if (video.description) allDescriptions.push(video.description.slice(0, 100)) // 最大100文字
-      if (video.summary) allSummaries.push(video.summary.slice(0, 150)) // 最大150文字
+      if (video.title) allTitles.push(video.title.slice(0, 200)) // 最大200文字に増加
+      if (video.skill) allSkills.push(video.skill.slice(0, 100))   // 最大100文字に増加
+      if (video.description) allDescriptions.push(video.description.slice(0, 300)) // 最大300文字に増加
+      if (video.summary) allSummaries.push(video.summary.slice(0, 400)) // 最大400文字に増加
     })
 
     // 全テキストを結合（サイズ制限）
@@ -74,10 +90,12 @@ export async function POST(request: NextRequest) {
     ].join(' ')
 
     // テキストサイズをさらに制限（Vercel APIボディサイズ対応）
-    if (allText.length > 3000) {
-      allText = allText.slice(0, 3000)
-      console.log('⚠️ テキストサイズを3000文字に制限しました')
+    if (allText.length > 10000) {
+      allText = allText.slice(0, 10000)
+      console.log('⚠️ テキストサイズを10000文字に制限しました')
     }
+    
+    console.log(`全テキスト文字数: ${allText.length}, 処理対象動画数: ${processData.length}`)
 
     // AI API使用可能かチェック
     const useAI = process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY
@@ -100,21 +118,7 @@ export async function POST(request: NextRequest) {
       keywords = extractKeywords(allText)
     }
 
-    // 既知の重要キーワードを追加
-    const importantKeywords = [
-      'Google Analytics', 'ROI', 'CPA', 'PDCAサイクル',
-      'Instagram', 'Facebook', 'Twitter', 'TikTok', 'YouTube',
-      'SEO', 'SEM', 'KPI', 'OKR', 'A/Bテスト',
-      'エンゲージメント率', 'コンバージョン率', 'CTR', 'CPM', 'ROAS',
-      'マーケティング', 'ブランディング', 'プロモーション',
-      'データ分析', 'アナリティクス', 'レポート作成'
-    ]
-
-    importantKeywords.forEach(keyword => {
-      if (allText.includes(keyword)) {
-        keywords.push(keyword)
-      }
-    })
+    // 事前定義キーワードは削除 - 純粋にデータから抽出
 
     // 重複除去
     keywords = [...new Set(keywords)]
@@ -137,8 +141,10 @@ export async function POST(request: NextRequest) {
       return !isGeneric && !hasNumberPattern && !tooShort
     })
 
-    // 最大30個に制限
-    const finalKeywords = filteredKeywords.slice(0, 30)
+    // 最大50個に増加
+    const finalKeywords = filteredKeywords.slice(0, 50)
+    
+    console.log(`生成されたキーワード数: ${keywords.length}, フィルタ後: ${filteredKeywords.length}, 最終: ${finalKeywords.length}`)
 
     return NextResponse.json({
       stage: 1,
