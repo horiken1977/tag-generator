@@ -8,7 +8,7 @@
       "maxDuration": 30
     }
   },
-  "regions": ["nrt1"],
+  "regions": ["hnd1"],
   "env": {
     "NODE_ENV": "production"
   },
