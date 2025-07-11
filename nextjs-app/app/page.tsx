@@ -50,6 +50,7 @@ export default function Home() {
   const [status, setStatus] = useState({ message: '', type: 'info' })
   const [currentStage, setCurrentStage] = useState(0)
   const [systemStatus, setSystemStatus] = useState<any>(null)
+  const [testingAI, setTestingAI] = useState(false)
 
   const showStatus = (message: string, type: 'info' | 'success' | 'danger' = 'info') => {
     setStatus({ message, type })
@@ -69,6 +70,40 @@ export default function Home() {
   useEffect(() => {
     checkSystemStatus()
   }, [])
+
+  const testAIConnection = async () => {
+    setTestingAI(true)
+    showStatus(`${aiEngine}との接続テスト中...`, 'info')
+
+    try {
+      const response = await axios.post('/api/ai/test', { 
+        engine: aiEngine 
+      }, {
+        timeout: 30000
+      })
+      
+      const result = response.data
+      if (result.success) {
+        showStatus(
+          `✅ ${result.message} - ${result.tags_generated}個のタグ生成, 処理時間: ${result.processing_time}ms`, 
+          'success'
+        )
+        console.log('AI接続テスト成功:', result)
+      } else {
+        showStatus(`❌ ${result.message}`, 'danger')
+        console.error('AI接続テスト失敗:', result)
+      }
+    } catch (error: any) {
+      if (error.code === 'ECONNABORTED') {
+        showStatus(`❌ ${aiEngine}との接続がタイムアウトしました`, 'danger')
+      } else {
+        showStatus(`❌ ${aiEngine}との接続テストでエラーが発生しました: ${error.message}`, 'danger')
+      }
+      console.error('AI接続テストエラー:', error)
+    } finally {
+      setTestingAI(false)
+    }
+  }
 
   const loadSheetData = async () => {
     if (!sheetsUrl) {
@@ -389,24 +424,36 @@ export default function Home() {
           </div>
           <div>
             <label className="block mb-2 font-bold">AIエンジン:</label>
-            <select
-              value={aiEngine}
-              onChange={(e) => setAiEngine(e.target.value)}
-              className="w-full p-3 rounded-lg bg-white/90 text-gray-800"
-            >
-              {systemStatus?.available_engines?.includes('openai') && (
-                <option value="openai">OpenAI (GPT-3.5)</option>
-              )}
-              {systemStatus?.available_engines?.includes('claude') && (
-                <option value="claude">Claude</option>
-              )}
-              {systemStatus?.available_engines?.includes('gemini') && (
-                <option value="gemini">Gemini</option>
-              )}
-              {!systemStatus?.available_engines?.length && (
-                <option value="fallback">フォールバックモード（キーワード抽出）</option>
-              )}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={aiEngine}
+                onChange={(e) => setAiEngine(e.target.value)}
+                className="flex-1 p-3 rounded-lg bg-white/90 text-gray-800"
+              >
+                {systemStatus?.available_engines?.includes('openai') && (
+                  <option value="openai">OpenAI (GPT-3.5)</option>
+                )}
+                {systemStatus?.available_engines?.includes('claude') && (
+                  <option value="claude">Claude</option>
+                )}
+                {systemStatus?.available_engines?.includes('gemini') && (
+                  <option value="gemini">Gemini</option>
+                )}
+                {!systemStatus?.available_engines?.length && (
+                  <option value="fallback">フォールバックモード（キーワード抽出）</option>
+                )}
+              </select>
+              <button
+                onClick={testAIConnection}
+                disabled={testingAI || loading}
+                className="px-4 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                {testingAI ? '🔄' : '🧪'} テスト
+              </button>
+            </div>
+            <p className="text-xs text-gray-300 mt-1">
+              テストボタンで選択したAIエンジンとの疎通確認ができます
+            </p>
           </div>
           <div className="flex gap-3">
             <button
