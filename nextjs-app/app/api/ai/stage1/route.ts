@@ -53,10 +53,96 @@ function extractKeywords(text: string): string[] {
   return keywords
 }
 
+function collectBatchTexts(processData: VideoData[]): string {
+  const allTitles: string[] = []
+  const allSkills: string[] = []
+  const allDescriptions: string[] = []
+  const allSummaries: string[] = []
+
+  processData.forEach(video => {
+    if (video.title) allTitles.push(video.title.slice(0, 200))
+    if (video.skill) allSkills.push(video.skill.slice(0, 100))
+    if (video.description) allDescriptions.push(video.description.slice(0, 300))
+    if (video.summary) allSummaries.push(video.summary.slice(0, 400))
+  })
+
+  return [
+    ...allTitles,
+    ...allSkills,
+    ...allDescriptions,
+    ...allSummaries
+  ].join(' ')
+}
+
+async function generateTagCandidates(allText: string): Promise<string[]> {
+  // テキストサイズを制限
+  if (allText.length > 15000) {
+    allText = allText.slice(0, 15000)
+    console.log('⚠️ テキストサイズを15000文字に制限しました')
+  }
+  
+  console.log(`全テキスト文字数: ${allText.length}`)
+
+  // AI API使用可能かチェック
+  const useAI = process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY
+  let keywords: string[] = []
+
+  if (useAI) {
+    // AI APIでタグ生成
+    try {
+      const aiClient = new AIClient()
+      const aiEngine = process.env.OPENAI_API_KEY ? 'openai' : 
+                     process.env.CLAUDE_API_KEY ? 'claude' : 'gemini'
+      keywords = await aiClient.generateTags(allText, aiEngine)
+      console.log(`AI生成完了 (${aiEngine}): ${keywords.length}個のタグ`)
+    } catch (error) {
+      console.error('AI生成失敗、フォールバック:', error)
+      keywords = extractKeywords(allText)
+    }
+  } else {
+    // フォールバック: キーワード抽出
+    keywords = extractKeywords(allText)
+  }
+
+  // 事前定義キーワードは削除 - 純粋にデータから抽出
+
+  // 重複除去
+  keywords = [...new Set(keywords)]
+
+  // 汎用語フィルタリング（緩和）
+  const genericWords = [
+    'について', 'による', 'ため', 'こと', 'もの', 'など',
+    'です', 'ます', 'した', 'する', 'なる', 'ある'
+  ]
+
+  const filteredKeywords = keywords.filter(keyword => {
+    // 明らかに不要な汎用語のみ除外
+    const isGeneric = genericWords.some(generic => keyword.endsWith(generic) || keyword === generic)
+    // 数字+つの パターンを除外
+    const hasNumberPattern = /\d+つの/.test(keyword)
+    // 短すぎる単語を除外
+    const tooShort = keyword.length < 2
+    // 1文字の助詞・記号を除外
+    const isSingleChar = /^[はがをでにへとのもやかからまで]$/.test(keyword)
+    
+    return !isGeneric && !hasNumberPattern && !tooShort && !isSingleChar
+  })
+
+  // 最大200個（当初仕様通り）
+  const finalKeywords = filteredKeywords.slice(0, 200)
+  
+  console.log(`生成されたキーワード数: ${keywords.length}, フィルタ後: ${filteredKeywords.length}, 最終: ${finalKeywords.length}`)
+
+  return finalKeywords
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const videoData: VideoData[] = body.data || []
+    const batchIndex = body.batch_index ?? null
+    const batchSize = body.batch_size || 100
+    const allBatchTexts = body.all_batch_texts || []
     
     if (!videoData.length) {
       return NextResponse.json({
@@ -65,7 +151,55 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 全データを処理（文字起こしを除外するため問題なし）
+    // バッチ処理の場合
+    if (batchIndex !== null) {
+      // バッチデータの処理
+      const startIdx = batchIndex * batchSize
+      const endIdx = Math.min(startIdx + batchSize, videoData.length)
+      const processData = videoData.slice(startIdx, endIdx)
+      
+      console.log(`Stage1 バッチ処理: ${startIdx}-${endIdx}/${videoData.length}件`)
+      
+      // このバッチのテキストを収集
+      const batchTexts = collectBatchTexts(processData)
+      
+      const isLastBatch = endIdx >= videoData.length
+      const totalBatches = Math.ceil(videoData.length / batchSize)
+      
+      if (isLastBatch) {
+        // 最後のバッチ: 全バッチのテキストを結合してタグ生成
+        const allTexts = [...allBatchTexts, batchTexts].join(' ')
+        const keywords = await generateTagCandidates(allTexts)
+        
+        return NextResponse.json({
+          stage: 1,
+          success: true,
+          tag_candidates: keywords,
+          candidate_count: keywords.length,
+          batch_info: {
+            current_batch: batchIndex,
+            total_batches: totalBatches,
+            is_last_batch: true
+          },
+          message: `全${videoData.length}件の分析からタグ候補を生成しました`
+        })
+      } else {
+        // 中間バッチ: テキストを収集して返す
+        return NextResponse.json({
+          stage: 1,
+          success: true,
+          batch_text: batchTexts,
+          batch_info: {
+            current_batch: batchIndex,
+            total_batches: totalBatches,
+            is_last_batch: false
+          },
+          message: `バッチ${batchIndex + 1}/${totalBatches}の処理が完了しました`
+        })
+      }
+    }
+
+    // 従来の一括処理（後方互換性）
     const processData = videoData
 
     // データ集約（文字起こし除外）

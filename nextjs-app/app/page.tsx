@@ -128,27 +128,45 @@ export default function Home() {
     showStatus('第1段階: タグ候補を生成中...')
 
     try {
-      // 全データを送信（Stage1は文字起こしを除外して処理するため問題なし）
-      showStatus(`第1段階: ${currentData.length}件の動画データを分析中...`)
-      
-      const response = await axios.post('/api/ai/stage1', { 
-        data: currentData 
-      }, {
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        timeout: 30000 // 30秒タイムアウト
-      })
-      
-      const result = response.data
-      if (result.success) {
-        setStage1Results(result)
-        showStatus(`✅ ${result.candidate_count}個のタグ候補を生成しました`, 'success')
-      } else {
-        showStatus(`❌ 第1段階エラー: ${result.error}`, 'danger')
+      const batchSize = 100
+      const totalBatches = Math.ceil(currentData.length / batchSize)
+      const allBatchTexts: string[] = []
+
+      showStatus(`第1段階: ${currentData.length}件を${totalBatches}バッチで処理中...`)
+
+      // バッチごとに処理
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        showStatus(`第1段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
+        
+        const response = await axios.post('/api/ai/stage1', {
+          data: currentData,
+          batch_index: batchIndex,
+          batch_size: batchSize,
+          all_batch_texts: allBatchTexts
+        }, {
+          timeout: 30000
+        })
+        
+        const batchResult = response.data
+        if (batchResult.success) {
+          if (batchResult.batch_info.is_last_batch) {
+            // 最後のバッチ: タグ候補が生成された
+            setStage1Results(batchResult)
+            showStatus(`✅ ${batchResult.candidate_count}個のタグ候補を生成しました`, 'success')
+            break
+          } else {
+            // 中間バッチ: テキストを蓄積
+            allBatchTexts.push(batchResult.batch_text)
+          }
+        } else {
+          showStatus(`❌ バッチ${batchIndex + 1}でエラー: ${batchResult.error}`, 'danger')
+          setLoading(false)
+          return
+        }
       }
     } catch (error: any) {
       if (error.response?.status === 413) {
-        showStatus(`❌ データサイズが大きすぎます。より少ない件数で試してください`, 'danger')
+        showStatus(`❌ データサイズが大きすぎます。バッチサイズを調整してください`, 'danger')
       } else {
         showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
       }
