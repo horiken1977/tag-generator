@@ -10,21 +10,15 @@ export class AIClient {
   private baseUrl = 'https://api.openai.com/v1/chat/completions'
   
   async generateTags(content: string, engine: string = 'openai'): Promise<string[]> {
-    try {
-      if (engine === 'openai') {
-        return await this.callOpenAI(content)
-      } else if (engine === 'claude') {
-        return await this.callClaude(content)
-      } else if (engine === 'gemini') {
-        return await this.callGemini(content)
-      }
-      
-      // Fallback to keyword extraction
-      return this.extractKeywords(content)
-    } catch (error) {
-      console.error('AI API error:', error)
-      return this.extractKeywords(content)
+    if (engine === 'openai') {
+      return await this.callOpenAI(content)
+    } else if (engine === 'claude') {
+      return await this.callClaude(content)
+    } else if (engine === 'gemini') {
+      return await this.callGemini(content)
     }
+    
+    throw new Error(`Unsupported AI engine: ${engine}`)
   }
   
   private async callOpenAI(content: string): Promise<string[]> {
@@ -109,7 +103,7 @@ export class AIClient {
     
     const prompt = this.buildPrompt(content)
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -193,30 +187,4 @@ ${content.substring(0, 2000)}
     return genericPatterns.some(pattern => pattern.test(tag))
   }
   
-  private extractKeywords(content: string): string[] {
-    // Fallback keyword extraction
-    const keywords: string[] = []
-    
-    // Extract English words
-    const englishWords = content.match(/[A-Z][a-zA-Z]+/g) || []
-    keywords.push(...englishWords.filter(w => w.length >= 3))
-    
-    // Extract katakana words
-    const katakanaWords = content.match(/[ァ-ヶー]+/g) || []
-    keywords.push(...katakanaWords.filter(w => w.length >= 3))
-    
-    // Extract important keywords
-    const importantKeywords = [
-      'Google Analytics', 'ROI', 'CPA', 'Instagram', 'Facebook', 
-      'SEO', 'SEM', 'KPI', 'OKR', 'エンゲージメント率'
-    ]
-    
-    importantKeywords.forEach(keyword => {
-      if (content.includes(keyword)) {
-        keywords.push(keyword)
-      }
-    })
-    
-    return [...new Set(keywords)].slice(0, 15)
-  }
 }
