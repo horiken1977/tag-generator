@@ -36,13 +36,7 @@ function collectBatchTexts(processData: VideoData[]): string {
 }
 
 async function generateTagCandidates(allText: string): Promise<string[]> {
-  // テキストサイズを調整（より多くのデータを保持）
-  if (allText.length > 20000) {
-    allText = allText.slice(0, 20000)
-    console.log('⚠️ テキストサイズを20000文字に制限しました')
-  }
-  
-  console.log(`全テキスト文字数: ${allText.length}`)
+  console.log(`📊 全テキスト文字数: ${allText.length} (450件の動画データ統合分析)`)
 
   // AI API環境変数の詳細チェック
   const hasOpenAI = !!process.env.OPENAI_API_KEY
@@ -95,8 +89,8 @@ async function generateTagCandidates(allText: string): Promise<string[]> {
     return !isGeneric && !hasNumberPattern && !tooShort && !isSingleChar
   })
 
-  // 最大200個（当初仕様通り）
-  const finalKeywords = filteredKeywords.slice(0, 200)
+  // 制限解除 - LLMからの全タグを使用
+  const finalKeywords = filteredKeywords
   
   console.log(`生成されたキーワード数: ${keywords.length}, フィルタ後: ${filteredKeywords.length}, 最終: ${finalKeywords.length}`)
 

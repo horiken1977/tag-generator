@@ -28,7 +28,9 @@ export class AIClient {
     }
     
     const prompt = this.buildPrompt(content)
+    console.log(`🤖 OpenAI API呼び出し開始 - プロンプト長: ${prompt.length}文字, コンテンツ長: ${content.length}文字`)
     
+    const startTime = Date.now()
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -43,7 +45,7 @@ export class AIClient {
             content: prompt
           }
         ],
-        max_tokens: 500,
+        max_tokens: 2000,
         temperature: 0.3
       })
     })
@@ -54,6 +56,10 @@ export class AIClient {
     
     const data = await response.json()
     const result = data.choices[0]?.message?.content || ''
+    const processingTime = Date.now() - startTime
+    
+    console.log(`✅ OpenAI API応答完了 - 処理時間: ${processingTime}ms, レスポンス長: ${result.length}文字`)
+    console.log(`📝 OpenAI生成内容プレビュー: "${result.substring(0, 200)}..."`)
     
     return this.parseTagsFromResponse(result)
   }
@@ -75,7 +81,7 @@ export class AIClient {
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 500,
+        max_tokens: 2000,
         messages: [
           {
             role: 'user',
@@ -120,7 +126,7 @@ export class AIClient {
         ],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 500
+          maxOutputTokens: 2000
         }
       })
     })
@@ -137,36 +143,43 @@ export class AIClient {
   
   private buildPrompt(content: string): string {
     return `
-以下のマーケティング動画データを分析して、具体的で検索に有用なタグを10-15個生成してください。
+以下は400-450件のマーケティング動画データの統合分析です。このデータ全体を深く分析して、具体的で検索に有用なタグを150-200個生成してください。
 
-【コンテンツ】:
-${content.substring(0, 2000)}
+【全動画データ】:
+${content}
+
+【重要な指示】:
+- 400-450件の動画データ全体を分析対象とする
+- 多様性を重視し、異なる分野・手法・ツールから幅広くタグを抽出
+- 150-200個の豊富なタグ候補を生成する
 
 【タグ生成の基準】:
-1. 具体的なツール名・サービス名・手法名
-2. 業界固有の概念・理論・フレームワーク  
-3. 測定可能な指標名・KPI
-4. 具体的なプロセス名・手順名
-5. 職種・業界・分野名
+1. 具体的なツール名・サービス名・手法名（Google Analytics、Instagram、Facebook、LinkedIn、YouTube等）
+2. 業界固有の概念・理論・フレームワーク（PDCA、SWOT、4P、カスタマージャーニー等）
+3. 測定可能な指標名・KPI（ROI、CPA、CTR、エンゲージメント率、コンバージョン率等）
+4. 具体的なプロセス名・手順名（A/Bテスト、セグメンテーション、ターゲティング等）
+5. 職種・業界・分野名（デジタルマーケティング、SNSマーケティング、コンテンツマーケティング等）
+6. 技術・プラットフォーム名（SEO、SEM、API、CRM等）
 
 【絶対に避けるべき汎用語】:
 - 「6つの要素」「8つの分類」「4つのポイント」等の数字+汎用語
 - 「要素」「分類」「ポイント」「手法」「方法」「技術」等の単体使用
 - 「基本」「応用」「実践」「理論」「概要」「入門」等の抽象表現
 
-出力: 具体的で有用なタグのみをカンマ区切りで出力してください。
+出力形式: 具体的で有用なタグのみをカンマ区切りで150-200個出力してください。1行ずつではなく、カンマ区切りで連続して出力してください。
 `
   }
   
   private parseTagsFromResponse(response: string): string[] {
-    // Extract tags from AI response
+    // Extract tags from AI response - expecting 150-200 tags
     const tags = response
       .split(/[,\n]/)
       .map(tag => tag.trim())
-      .filter(tag => tag.length > 0 && tag.length < 50)
+      .filter(tag => tag.length > 0)
       .filter(tag => !this.isGenericTag(tag))
-      .slice(0, 15)
+      // No limit - allow all tags from LLM response
     
+    console.log(`🏷️ AIから受信したタグ数: ${tags.length}`)
     return tags
   }
   
