@@ -59,10 +59,10 @@ export async function POST(request: NextRequest) {
     const allSummaries: string[] = []
 
     processData.forEach(video => {
-      if (video.title) allTitles.push(video.title.slice(0, 100)) // 最大100文字
-      if (video.skill) allSkills.push(video.skill.slice(0, 50))   // 最大50文字
-      if (video.description) allDescriptions.push(video.description.slice(0, 200)) // 最大200文字
-      if (video.summary) allSummaries.push(video.summary.slice(0, 300)) // 最大300文字
+      if (video.title) allTitles.push(video.title.slice(0, 50)) // 最大50文字
+      if (video.skill) allSkills.push(video.skill.slice(0, 20))   // 最大20文字
+      if (video.description) allDescriptions.push(video.description.slice(0, 100)) // 最大100文字
+      if (video.summary) allSummaries.push(video.summary.slice(0, 150)) // 最大150文字
     })
 
     // 全テキストを結合（サイズ制限）
@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
     ].join(' ')
 
     // テキストサイズをさらに制限（Vercel APIボディサイズ対応）
-    if (allText.length > 5000) {
-      allText = allText.slice(0, 5000)
-      console.log('⚠️ テキストサイズを5000文字に制限しました')
+    if (allText.length > 3000) {
+      allText = allText.slice(0, 3000)
+      console.log('⚠️ テキストサイズを3000文字に制限しました')
     }
 
     // AI API使用可能かチェック

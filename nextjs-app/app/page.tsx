@@ -205,12 +205,20 @@ export default function Home() {
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
         
+        // バッチデータの準備（文字起こしを短縮）
+        const batchStart = batchIndex * batchSize
+        const batchEnd = Math.min(batchStart + batchSize, currentData.length)
+        const batchData = currentData.slice(batchStart, batchEnd).map(video => ({
+          ...video,
+          transcript: video.transcript ? video.transcript.slice(0, 500) : '' // 最大500文字
+        }))
+        
         const response = await axios.post('/api/ai/stage2', {
-          data: currentData,
+          data: batchData,
           approved_candidates: approvedCandidates,
           ai_engine: aiEngine,
-          batch_index: batchIndex,
-          batch_size: batchSize
+          batch_index: 0, // バッチデータは既に切り出し済み
+          batch_size: batchData.length
         }, {
           timeout: 30000
         })

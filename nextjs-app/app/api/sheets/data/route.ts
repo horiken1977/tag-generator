@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
         } else if (header.includes('summary') || header.includes('要約')) {
           row.summary = cleanValue
         } else if (header.includes('transcript') || header.includes('文字起こし')) {
-          row.transcript = cleanValue
+          // 文字起こしは保存しない（Stage1では不要、Stage2で個別取得）
+          row.transcript = ''
         }
       })
 
