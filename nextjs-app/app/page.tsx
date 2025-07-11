@@ -128,7 +128,22 @@ export default function Home() {
     showStatus('第1段階: タグ候補を生成中...')
 
     try {
-      const response = await axios.post('/api/ai/stage1', { data: currentData })
+      // データサイズをチェックし、必要に応じて分割
+      const maxDataSize = 20 // 最大20件ずつ処理
+      const dataToProcess = currentData.slice(0, maxDataSize)
+      
+      if (currentData.length > maxDataSize) {
+        showStatus(`⚠️ データ量が多いため、最初の${maxDataSize}件のみ処理します`, 'info')
+      }
+      
+      const response = await axios.post('/api/ai/stage1', { 
+        data: dataToProcess 
+      }, {
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 30000 // 30秒タイムアウト
+      })
+      
       const result = response.data
       if (result.success) {
         setStage1Results(result)
@@ -137,7 +152,11 @@ export default function Home() {
         showStatus(`❌ 第1段階エラー: ${result.error}`, 'danger')
       }
     } catch (error: any) {
-      showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
+      if (error.response?.status === 413) {
+        showStatus(`❌ データサイズが大きすぎます。より少ない件数で試してください`, 'danger')
+      } else {
+        showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
+      }
     } finally {
       setLoading(false)
     }

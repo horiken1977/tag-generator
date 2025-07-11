@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AIClient } from '@/lib/ai-client'
 
+// Vercelのボディサイズ制限とタイムアウト設定
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 interface VideoData {
   title?: string
   skill?: string
