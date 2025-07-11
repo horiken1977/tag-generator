@@ -97,9 +97,13 @@ export async function POST(request: NextRequest) {
     // デバッグ情報を追加
     console.log(`CSVパース: ${lines.length}行を検出`)
 
-    // 安全のため最大5000行に制限
-    const maxRows = Math.min(lines.length, 5000)
-    console.log(`Processing maximum ${maxRows} rows`)
+    // 厳格な行数制限（400行程度を想定）
+    const maxRows = Math.min(lines.length, 500)
+    console.log(`Processing maximum ${maxRows} rows (limited for safety)`)
+    
+    if (lines.length > 500) {
+      console.log(`⚠️ WARNING: CSV has ${lines.length} lines, limiting to first 500 rows`)
+    }
 
     for (let i = 1; i < maxRows; i++) {
       // 空行をスキップ
@@ -150,16 +154,25 @@ export async function POST(request: NextRequest) {
       })
 
       // 必須フィールドの確認とデフォルト値設定
-      if (row.title && row.title.trim()) {
-        row.skill = row.skill || 'ビジネススキル'
-        row.description = row.description || row.title
-        row.summary = row.summary || row.title
-        row.transcript = ''
-        data.push(row)
+      if (row.title && row.title.trim() && row.title.length > 3) {
+        // タイトルが短すぎるものや無意味なものを除外
+        if (!/^[\s\-_,\.]*$/.test(row.title)) {
+          row.skill = row.skill || 'ビジネススキル'
+          row.description = row.description || row.title
+          row.summary = row.summary || row.title
+          row.transcript = ''
+          data.push(row)
+        }
       }
     }
     
     console.log(`処理済み: ${data.length}件のデータ`)
+    
+    // 最終的なデータ数制限（400件程度を想定）
+    if (data.length > 450) {
+      console.log(`⚠️ データが多すぎます (${data.length}件) - 最初の450件に制限`)
+      data.splice(450)
+    }
     
     // JSONサイズの確認
     const jsonString = JSON.stringify(data)
