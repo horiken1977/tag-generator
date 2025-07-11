@@ -87,32 +87,53 @@ async function generateTagCandidates(allText: string): Promise<string[]> {
   const useAI = process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY
   let keywords: string[] = []
 
+  // AI API環境変数の詳細チェック
+  const hasOpenAI = !!process.env.OPENAI_API_KEY
+  const hasClaude = !!process.env.CLAUDE_API_KEY
+  const hasGemini = !!process.env.GEMINI_API_KEY
+  
+  console.log(`🔍 AI環境変数チェック: OpenAI=${hasOpenAI}, Claude=${hasClaude}, Gemini=${hasGemini}`)
+  
   if (useAI) {
     // AI APIでタグ生成を優先実行
     console.log('🤖 AI分析開始 - LLMでタグ候補を生成中...')
+    console.log(`📝 分析対象テキスト: "${allText.slice(0, 100)}..."`)
+    
+    const startTime = Date.now()
     try {
       const aiClient = new AIClient()
       const aiEngine = process.env.OPENAI_API_KEY ? 'openai' : 
                      process.env.CLAUDE_API_KEY ? 'claude' : 'gemini'
+      
+      console.log(`🎯 使用AIエンジン: ${aiEngine}`)
+      console.log('⏳ AI API呼び出し中...')
+      
       keywords = await aiClient.generateTags(allText, aiEngine)
-      console.log(`✅ AI生成完了 (${aiEngine}): ${keywords.length}個のタグ`)
+      
+      const processingTime = Date.now() - startTime
+      console.log(`✅ AI生成完了 (${aiEngine}): ${keywords.length}個のタグ, 処理時間: ${processingTime}ms`)
+      console.log(`🏷️ 生成されたタグ例: ${keywords.slice(0, 5).join(', ')}`)
       
       // LLMから十分なタグが得られた場合はそれを使用
       if (keywords.length >= 50) {
         console.log('🎯 AI生成タグが十分な数あります - AI結果を優先使用')
       } else {
-        console.log('⚠️ AI生成タグが少ないため、キーワード抽出で補完します')
+        console.log(`⚠️ AI生成タグが少ない(${keywords.length}個)ため、キーワード抽出で補完します`)
         const extractedKeywords = extractKeywords(allText)
+        console.log(`🔧 キーワード抽出で${extractedKeywords.length}個追加`)
         keywords = [...keywords, ...extractedKeywords]
       }
     } catch (error) {
-      console.error('❌ AI生成失敗、キーワード抽出にフォールバック:', error)
+      const processingTime = Date.now() - startTime
+      console.error(`❌ AI生成失敗 (${processingTime}ms)、キーワード抽出にフォールバック:`, error)
       keywords = extractKeywords(allText)
+      console.log(`🔧 フォールバック完了: ${keywords.length}個のキーワード抽出`)
     }
   } else {
     // フォールバック: キーワード抽出
     console.log('🔧 AIキーなし - キーワード抽出で処理')
     keywords = extractKeywords(allText)
+    console.log(`🔧 キーワード抽出完了: ${keywords.length}個`)
   }
 
   // 事前定義キーワードは削除 - 純粋にデータから抽出
