@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
     ].join(' ')
 
     // テキストサイズをさらに制限（Vercel APIボディサイズ対応）
-    if (allText.length > 10000) {
-      allText = allText.slice(0, 10000)
-      console.log('⚠️ テキストサイズを10000文字に制限しました')
+    if (allText.length > 15000) {
+      allText = allText.slice(0, 15000)
+      console.log('⚠️ テキストサイズを15000文字に制限しました')
     }
     
     console.log(`全テキスト文字数: ${allText.length}, 処理対象動画数: ${processData.length}`)
@@ -123,26 +123,27 @@ export async function POST(request: NextRequest) {
     // 重複除去
     keywords = [...new Set(keywords)]
 
-    // 汎用語フィルタリング
+    // 汎用語フィルタリング（緩和）
     const genericWords = [
-      '要素', '分類', 'ポイント', '手法', '方法', '技術',
-      '基本', '応用', '実践', '理論', '概要', '入門',
-      'について', 'による', 'ため', 'こと', 'もの'
+      'について', 'による', 'ため', 'こと', 'もの', 'など',
+      'です', 'ます', 'した', 'する', 'なる', 'ある'
     ]
 
     const filteredKeywords = keywords.filter(keyword => {
-      // 汎用語を含むか確認
-      const isGeneric = genericWords.some(generic => keyword.includes(generic))
+      // 明らかに不要な汎用語のみ除外
+      const isGeneric = genericWords.some(generic => keyword.endsWith(generic) || keyword === generic)
       // 数字+つの パターンを除外
       const hasNumberPattern = /\d+つの/.test(keyword)
       // 短すぎる単語を除外
       const tooShort = keyword.length < 2
+      // 1文字の助詞・記号を除外
+      const isSingleChar = /^[はがをでにへとのもやかからまで]$/.test(keyword)
       
-      return !isGeneric && !hasNumberPattern && !tooShort
+      return !isGeneric && !hasNumberPattern && !tooShort && !isSingleChar
     })
 
-    // 最大50個に増加
-    const finalKeywords = filteredKeywords.slice(0, 50)
+    // 最大200個（当初仕様通り）
+    const finalKeywords = filteredKeywords.slice(0, 200)
     
     console.log(`生成されたキーワード数: ${keywords.length}, フィルタ後: ${filteredKeywords.length}, 最終: ${finalKeywords.length}`)
 
