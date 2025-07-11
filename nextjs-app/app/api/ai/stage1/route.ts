@@ -205,27 +205,33 @@ export async function POST(request: NextRequest) {
         // 最後のバッチ: 全バッチのテキストを結合してタグ生成
         const allTexts = [...allBatchTexts, batchTexts].join(' ')
         console.log(`全バッチ完了: 総テキスト長=${allTexts.length}文字, バッチ数=${allBatchTexts.length + 1}`)
+        console.log(`🤖 LLM分析開始: 全${totalDataLength}件のデータを統合分析中...`)
         
+        const startTime = Date.now()
         const keywords = await generateTagCandidates(allTexts)
+        const processingTime = Date.now() - startTime
+        
+        console.log(`✅ LLM分析完了: ${keywords.length}個のタグ生成, 処理時間: ${processingTime}ms`)
         
         return NextResponse.json({
           stage: 1,
           success: true,
           tag_candidates: keywords,
           candidate_count: keywords.length,
+          processing_time: processingTime / 1000, // Convert to seconds
           batch_info: {
             current_batch: batchIndex,
             total_batches: totalBatches,
             is_last_batch: true,
             total_text_length: allTexts.length,
-            processed_videos: videoData.length
+            processed_videos: totalDataLength
           },
           source_data_stats: {
-            total_videos: videoData.length,
+            total_videos: totalDataLength,
             total_batches: totalBatches,
             transcripts_excluded: true
           },
-          message: `全${videoData.length}件の分析からタグ候補を生成しました`
+          message: `全${totalDataLength}件の分析からタグ候補を生成しました（処理時間: ${(processingTime/1000).toFixed(1)}秒）`
         })
       } else {
         // 中間バッチ: テキストを収集して返す
