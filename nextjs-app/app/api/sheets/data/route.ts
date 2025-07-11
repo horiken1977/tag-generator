@@ -65,7 +65,9 @@ export async function POST(request: NextRequest) {
     }
 
     const csvText = await response.text()
-    const lines = csvText.trim().split('\n')
+    // 改行の正規化（CR、LF、CRLFに対応）
+    const normalizedText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    const lines = normalizedText.trim().split('\n').filter(line => line.trim() !== '')
     
     if (lines.length < 2) {
       return NextResponse.json({
@@ -78,8 +80,36 @@ export async function POST(request: NextRequest) {
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
     const data = []
 
+    // デバッグ情報を追加
+    console.log(`CSVパース: ${lines.length}行を検出`)
+
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].match(/(".*?"|[^,]+)/g) || []
+      // 空行をスキップ
+      if (!lines[i].trim()) continue
+      
+      // CSVの行をより正確にパース
+      const values = []
+      let current = ''
+      let inQuotes = false
+      
+      for (let j = 0; j < lines[i].length; j++) {
+        const char = lines[i][j]
+        const nextChar = lines[i][j + 1]
+        
+        if (char === '"' && nextChar === '"') {
+          current += '"'
+          j++ // スキップ
+        } else if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          values.push(current)
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      values.push(current) // 最後の値を追加
+      
       const row: any = {}
       
       values.forEach((value, index) => {
@@ -88,28 +118,30 @@ export async function POST(request: NextRequest) {
         
         // 列名のマッピング
         if (header.includes('title') || header.includes('タイトル')) {
-          row.title = cleanValue
+          row.title = cleanValue.slice(0, 100) // 文字数制限
         } else if (header.includes('skill') || header.includes('スキル')) {
-          row.skill = cleanValue
+          row.skill = cleanValue.slice(0, 50)
         } else if (header.includes('description') || header.includes('説明')) {
-          row.description = cleanValue
+          row.description = cleanValue.slice(0, 200)
         } else if (header.includes('summary') || header.includes('要約')) {
-          row.summary = cleanValue
+          row.summary = cleanValue.slice(0, 200)
         } else if (header.includes('transcript') || header.includes('文字起こし')) {
-          // 文字起こしは保存しない（Stage1では不要、Stage2で個別取得）
+          // 文字起こしは保存しない
           row.transcript = ''
         }
       })
 
       // 必須フィールドの確認とデフォルト値設定
-      if (row.title) {
+      if (row.title && row.title.trim()) {
         row.skill = row.skill || 'ビジネススキル'
         row.description = row.description || row.title
         row.summary = row.summary || row.title
-        row.transcript = row.transcript || row.description || ''
+        row.transcript = ''
         data.push(row)
       }
     }
+    
+    console.log(`処理済み: ${data.length}件のデータ`)
 
     return NextResponse.json({
       success: true,
