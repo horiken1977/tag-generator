@@ -128,16 +128,11 @@ export default function Home() {
     showStatus('第1段階: タグ候補を生成中...')
 
     try {
-      // データサイズをチェックし、必要に応じて分割
-      const maxDataSize = 20 // 最大20件ずつ処理
-      const dataToProcess = currentData.slice(0, maxDataSize)
-      
-      if (currentData.length > maxDataSize) {
-        showStatus(`⚠️ データ量が多いため、最初の${maxDataSize}件のみ処理します`, 'info')
-      }
+      // 全データを送信（Stage1は文字起こしを除外して処理するため問題なし）
+      showStatus(`第1段階: ${currentData.length}件の動画データを分析中...`)
       
       const response = await axios.post('/api/ai/stage1', { 
-        data: dataToProcess 
+        data: currentData 
       }, {
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
@@ -201,21 +196,60 @@ export default function Home() {
     showStatus('第2段階: 個別動画を分析中...')
 
     try {
-      const response = await axios.post('/api/ai/stage2', {
-        data: currentData,
-        approved_candidates: approvedCandidates,
-        ai_engine: aiEngine
-      })
-      const result = response.data
-      if (result.success) {
-        setStage2Results(result)
-        showStatus(`✅ ${result.results.length}件の動画タグ付けが完了しました`, 'success')
-        setCurrentStage(3)
-      } else {
-        showStatus(`❌ 第2段階エラー: ${result.error}`, 'danger')
+      const batchSize = 20
+      const totalBatches = Math.ceil(currentData.length / batchSize)
+      const allResults: any[] = []
+      let totalProcessingTime = 0
+
+      // バッチごとに処理
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
+        
+        const response = await axios.post('/api/ai/stage2', {
+          data: currentData,
+          approved_candidates: approvedCandidates,
+          ai_engine: aiEngine,
+          batch_index: batchIndex,
+          batch_size: batchSize
+        }, {
+          timeout: 30000
+        })
+        
+        const batchResult = response.data
+        if (batchResult.success) {
+          allResults.push(...batchResult.results)
+          totalProcessingTime += batchResult.statistics.processing_time
+        } else {
+          showStatus(`❌ バッチ${batchIndex + 1}でエラー: ${batchResult.error}`, 'danger')
+          setLoading(false)
+          return
+        }
       }
+
+      // 全バッチ完了後の統計計算
+      const totalTagsAssigned = allResults.reduce((sum, r) => sum + r.selected_tags.length, 0)
+      
+      setStage2Results({
+        stage: 2,
+        success: true,
+        results: allResults,
+        statistics: {
+          total_videos: currentData.length,
+          avg_tags_per_video: totalTagsAssigned / currentData.length,
+          total_tags_assigned: totalTagsAssigned,
+          processing_time: totalProcessingTime
+        },
+        message: `全${currentData.length}件の動画タグ付けが完了しました`
+      })
+      
+      showStatus(`✅ ${allResults.length}件の動画タグ付けが完了しました`, 'success')
+      setCurrentStage(3)
     } catch (error: any) {
-      showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
+      if (error.response?.status === 413) {
+        showStatus(`❌ データサイズが大きすぎます。バッチサイズを調整してください`, 'danger')
+      } else {
+        showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
+      }
     } finally {
       setLoading(false)
     }

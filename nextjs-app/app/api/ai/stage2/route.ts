@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Vercelのボディサイズ制限とタイムアウト設定
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 interface VideoData {
   title: string
   skill: string
@@ -63,6 +67,8 @@ export async function POST(request: NextRequest) {
     const videoData: VideoData[] = body.data || []
     const approvedCandidates: string[] = body.approved_candidates || []
     const aiEngine = body.ai_engine || 'openai'
+    const batchIndex = body.batch_index || 0
+    const batchSize = body.batch_size || 20
 
     if (!videoData.length) {
       return NextResponse.json({
@@ -80,16 +86,23 @@ export async function POST(request: NextRequest) {
     }
 
     const startTime = Date.now()
+    
+    // バッチ処理のための範囲計算
+    const startIdx = batchIndex * batchSize
+    const endIdx = Math.min(startIdx + batchSize, videoData.length)
+    const batchData = videoData.slice(startIdx, endIdx)
     const results = []
 
-    // 各動画を個別に処理
-    for (let i = 0; i < videoData.length; i++) {
-      const video = videoData[i]
+    console.log(`バッチ処理: ${startIdx}-${endIdx}/${videoData.length}件`)
+
+    // バッチ内の各動画を処理
+    for (let i = 0; i < batchData.length; i++) {
+      const video = batchData[i]
       const selectedTags = selectTagsForVideo(video, approvedCandidates)
       const confidence = calculateConfidence(selectedTags, video)
 
       results.push({
-        video_index: i,
+        video_index: startIdx + i,
         title: video.title,
         selected_tags: selectedTags,
         tag_count: selectedTags.length,
@@ -98,20 +111,28 @@ export async function POST(request: NextRequest) {
     }
 
     const processingTime = (Date.now() - startTime) / 1000
-    const totalTagsAssigned = results.reduce((sum, r) => sum + r.selected_tags.length, 0)
+    const isLastBatch = endIdx >= videoData.length
+    const totalBatches = Math.ceil(videoData.length / batchSize)
 
     return NextResponse.json({
       stage: 2,
       success: true,
+      batch_info: {
+        current_batch: batchIndex,
+        total_batches: totalBatches,
+        batch_size: batchSize,
+        processed_in_batch: results.length,
+        is_last_batch: isLastBatch
+      },
       results: results,
       statistics: {
+        batch_videos: batchData.length,
         total_videos: videoData.length,
-        avg_tags_per_video: totalTagsAssigned / videoData.length,
-        total_tags_assigned: totalTagsAssigned,
-        approved_candidates_used: approvedCandidates.length,
         processing_time: processingTime
       },
-      message: '全動画のタグ付けが完了しました'
+      message: isLastBatch ? 
+        `全${videoData.length}件の処理が完了しました` : 
+        `バッチ${batchIndex + 1}/${totalBatches}の処理が完了しました`
     })
 
   } catch (error: any) {

@@ -49,9 +49,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // バッチサイズ制限（Vercel対応）
-    const maxBatchSize = 20
-    const processData = videoData.slice(0, maxBatchSize)
+    // 全データを処理（文字起こしを除外するため問題なし）
+    const processData = videoData
 
     // データ集約（文字起こし除外）
     const allTitles: string[] = []
