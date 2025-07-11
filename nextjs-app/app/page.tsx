@@ -138,11 +138,19 @@ export default function Home() {
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         showStatus(`第1段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
         
+        // このバッチで処理するデータの範囲を計算
+        const startIdx = batchIndex * batchSize
+        const endIdx = Math.min(startIdx + batchSize, currentData.length)
+        const batchData = currentData.slice(startIdx, endIdx)
+        
+        console.log(`クライアント: バッチ${batchIndex}送信, 範囲=${startIdx}-${endIdx}, バッチ件数=${batchData.length}, 蓄積テキスト数=${allBatchTexts.length}`)
+        
         const response = await axios.post('/api/ai/stage1', {
-          data: currentData,
+          data: batchData,
           batch_index: batchIndex,
           batch_size: batchSize,
-          all_batch_texts: allBatchTexts
+          all_batch_texts: allBatchTexts,
+          total_data_length: currentData.length // 総件数を追加
         }, {
           timeout: 30000
         })

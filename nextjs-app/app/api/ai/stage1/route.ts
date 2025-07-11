@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
     const batchIndex = body.batch_index ?? null
     const batchSize = body.batch_size || 100
     const allBatchTexts = body.all_batch_texts || []
+    const totalDataLength = body.total_data_length || videoData.length
     
     if (!videoData.length) {
       return NextResponse.json({
@@ -164,18 +165,20 @@ export async function POST(request: NextRequest) {
 
     // バッチ処理の場合
     if (batchIndex !== null) {
-      // バッチデータの処理
-      const startIdx = batchIndex * batchSize
-      const endIdx = Math.min(startIdx + batchSize, videoData.length)
-      const processData = videoData.slice(startIdx, endIdx)
+      // このバッチのデータを処理（クライアントから既に切り出し済み）
+      const processData = videoData
       
-      console.log(`Stage1 バッチ処理: ${startIdx}-${endIdx}/${videoData.length}件`)
+      console.log(`Stage1 バッチ処理: バッチ${batchIndex}, 受信データ=${videoData.length}件, 総データ=${totalDataLength}件`)
       
       // このバッチのテキストを収集
       const batchTexts = collectBatchTexts(processData)
       
-      const isLastBatch = endIdx >= videoData.length
-      const totalBatches = Math.ceil(videoData.length / batchSize)
+      // 総件数を基準にバッチ判定（重要！）
+      const currentProcessed = (batchIndex + 1) * batchSize
+      const isLastBatch = currentProcessed >= totalDataLength
+      const totalBatches = Math.ceil(totalDataLength / batchSize)
+      
+      console.log(`バッチ判定: batchIndex=${batchIndex}, currentProcessed=${currentProcessed}, totalDataLength=${totalDataLength}, isLastBatch=${isLastBatch}, totalBatches=${totalBatches}`)
       
       if (isLastBatch) {
         // 最後のバッチ: 全バッチのテキストを結合してタグ生成
