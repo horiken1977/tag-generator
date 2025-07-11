@@ -152,11 +152,12 @@ export default function Home() {
           if (batchResult.batch_info.is_last_batch) {
             // 最後のバッチ: タグ候補が生成された
             setStage1Results(batchResult)
-            showStatus(`✅ ${batchResult.candidate_count}個のタグ候補を生成しました`, 'success')
-            break
+            showStatus(`✅ 全${currentData.length}件の分析完了: ${batchResult.candidate_count}個のタグ候補を生成しました`, 'success')
+            // 第2段階には自動で進まない
           } else {
             // 中間バッチ: テキストを蓄積
             allBatchTexts.push(batchResult.batch_text)
+            showStatus(`第1段階: バッチ ${batchIndex + 1}/${totalBatches} 完了 - データ収集中...`)
           }
         } else {
           showStatus(`❌ バッチ${batchIndex + 1}でエラー: ${batchResult.error}`, 'danger')

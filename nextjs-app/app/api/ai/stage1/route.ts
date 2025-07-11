@@ -75,10 +75,10 @@ function collectBatchTexts(processData: VideoData[]): string {
 }
 
 async function generateTagCandidates(allText: string): Promise<string[]> {
-  // テキストサイズを制限
-  if (allText.length > 15000) {
-    allText = allText.slice(0, 15000)
-    console.log('⚠️ テキストサイズを15000文字に制限しました')
+  // テキストサイズを調整（より多くのデータを保持）
+  if (allText.length > 20000) {
+    allText = allText.slice(0, 20000)
+    console.log('⚠️ テキストサイズを20000文字に制限しました')
   }
   
   console.log(`全テキスト文字数: ${allText.length}`)
@@ -88,19 +88,30 @@ async function generateTagCandidates(allText: string): Promise<string[]> {
   let keywords: string[] = []
 
   if (useAI) {
-    // AI APIでタグ生成
+    // AI APIでタグ生成を優先実行
+    console.log('🤖 AI分析開始 - LLMでタグ候補を生成中...')
     try {
       const aiClient = new AIClient()
       const aiEngine = process.env.OPENAI_API_KEY ? 'openai' : 
                      process.env.CLAUDE_API_KEY ? 'claude' : 'gemini'
       keywords = await aiClient.generateTags(allText, aiEngine)
-      console.log(`AI生成完了 (${aiEngine}): ${keywords.length}個のタグ`)
+      console.log(`✅ AI生成完了 (${aiEngine}): ${keywords.length}個のタグ`)
+      
+      // LLMから十分なタグが得られた場合はそれを使用
+      if (keywords.length >= 50) {
+        console.log('🎯 AI生成タグが十分な数あります - AI結果を優先使用')
+      } else {
+        console.log('⚠️ AI生成タグが少ないため、キーワード抽出で補完します')
+        const extractedKeywords = extractKeywords(allText)
+        keywords = [...keywords, ...extractedKeywords]
+      }
     } catch (error) {
-      console.error('AI生成失敗、フォールバック:', error)
+      console.error('❌ AI生成失敗、キーワード抽出にフォールバック:', error)
       keywords = extractKeywords(allText)
     }
   } else {
     // フォールバック: キーワード抽出
+    console.log('🔧 AIキーなし - キーワード抽出で処理')
     keywords = extractKeywords(allText)
   }
 
@@ -169,6 +180,8 @@ export async function POST(request: NextRequest) {
       if (isLastBatch) {
         // 最後のバッチ: 全バッチのテキストを結合してタグ生成
         const allTexts = [...allBatchTexts, batchTexts].join(' ')
+        console.log(`全バッチ完了: 総テキスト長=${allTexts.length}文字, バッチ数=${allBatchTexts.length + 1}`)
+        
         const keywords = await generateTagCandidates(allTexts)
         
         return NextResponse.json({
@@ -179,7 +192,14 @@ export async function POST(request: NextRequest) {
           batch_info: {
             current_batch: batchIndex,
             total_batches: totalBatches,
-            is_last_batch: true
+            is_last_batch: true,
+            total_text_length: allTexts.length,
+            processed_videos: videoData.length
+          },
+          source_data_stats: {
+            total_videos: videoData.length,
+            total_batches: totalBatches,
+            transcripts_excluded: true
           },
           message: `全${videoData.length}件の分析からタグ候補を生成しました`
         })
