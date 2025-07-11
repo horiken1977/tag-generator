@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // バッチサイズ制限
-    const maxBatchSize = 50
+    // バッチサイズ制限（Vercel対応）
+    const maxBatchSize = 20
     const processData = videoData.slice(0, maxBatchSize)
 
     // データ集約（文字起こし除外）
@@ -56,19 +56,25 @@ export async function POST(request: NextRequest) {
     const allSummaries: string[] = []
 
     processData.forEach(video => {
-      if (video.title) allTitles.push(video.title)
-      if (video.skill) allSkills.push(video.skill)
-      if (video.description) allDescriptions.push(video.description)
-      if (video.summary) allSummaries.push(video.summary)
+      if (video.title) allTitles.push(video.title.slice(0, 100)) // 最大100文字
+      if (video.skill) allSkills.push(video.skill.slice(0, 50))   // 最大50文字
+      if (video.description) allDescriptions.push(video.description.slice(0, 200)) // 最大200文字
+      if (video.summary) allSummaries.push(video.summary.slice(0, 300)) // 最大300文字
     })
 
-    // 全テキストを結合
-    const allText = [
+    // 全テキストを結合（サイズ制限）
+    let allText = [
       ...allTitles,
       ...allSkills,
       ...allDescriptions,
       ...allSummaries
     ].join(' ')
+
+    // テキストサイズをさらに制限（Vercel APIボディサイズ対応）
+    if (allText.length > 5000) {
+      allText = allText.slice(0, 5000)
+      console.log('⚠️ テキストサイズを5000文字に制限しました')
+    }
 
     // AI API使用可能かチェック
     const useAI = process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY
