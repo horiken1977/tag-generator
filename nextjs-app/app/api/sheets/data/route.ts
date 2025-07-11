@@ -65,9 +65,21 @@ export async function POST(request: NextRequest) {
     }
 
     const csvText = await response.text()
+    
+    // 詳細なデバッグ情報
+    console.log('=== CSV DEBUG INFO ===')
+    console.log(`Raw CSV length: ${csvText.length} characters`)
+    console.log(`First 500 chars: ${csvText.slice(0, 500)}`)
+    console.log(`Contains \\r: ${csvText.includes('\r')}`)
+    console.log(`Contains \\n: ${csvText.includes('\n')}`)
+    console.log(`Contains \\r\\n: ${csvText.includes('\r\n')}`)
+    
     // 改行の正規化（CR、LF、CRLFに対応）
     const normalizedText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     const lines = normalizedText.trim().split('\n').filter(line => line.trim() !== '')
+    
+    console.log(`Lines after split: ${lines.length}`)
+    console.log(`First 5 lines:`, lines.slice(0, 5))
     
     if (lines.length < 2) {
       return NextResponse.json({
@@ -78,12 +90,18 @@ export async function POST(request: NextRequest) {
 
     // CSVをパース
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+    console.log(`Headers detected:`, headers)
+    
     const data = []
 
     // デバッグ情報を追加
     console.log(`CSVパース: ${lines.length}行を検出`)
 
-    for (let i = 1; i < lines.length; i++) {
+    // 安全のため最大5000行に制限
+    const maxRows = Math.min(lines.length, 5000)
+    console.log(`Processing maximum ${maxRows} rows`)
+
+    for (let i = 1; i < maxRows; i++) {
       // 空行をスキップ
       if (!lines[i].trim()) continue
       
@@ -142,6 +160,11 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`処理済み: ${data.length}件のデータ`)
+    
+    // JSONサイズの確認
+    const jsonString = JSON.stringify(data)
+    console.log(`JSON size: ${jsonString.length} characters`)
+    console.log(`JSON size: ${(jsonString.length / 1024 / 1024).toFixed(2)} MB`)
 
     return NextResponse.json({
       success: true,
@@ -149,7 +172,12 @@ export async function POST(request: NextRequest) {
       total_rows: data.length,
       processed_rows: data.length,
       source: 'google_sheets',
-      sheet_id: sheetId
+      sheet_id: sheetId,
+      debug_info: {
+        csv_lines: lines.length,
+        processed_data: data.length,
+        json_size_mb: (jsonString.length / 1024 / 1024).toFixed(2)
+      }
     })
 
   } catch (error: any) {
