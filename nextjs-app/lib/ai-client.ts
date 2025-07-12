@@ -220,13 +220,30 @@ ${content}
 - 汎用的すぎる語（「方法」「技術」等）
 - 助詞・接続詞
 
-出力: キーワードのみをカンマ区切りで3-5個出力してください。
+出力: 最も重要なキーワードのみをカンマ区切りで3-5個出力してください。重複を避け、簡潔に。
 `
   }
 
   // Stage1B: 全体最適化用プロンプト
   private buildOptimizePrompt(keywords: string[]): string {
-    const keywordText = keywords.join(', ')
+    // キーワードテキストが長すぎる場合は制限
+    let keywordText = keywords.join(', ')
+    const maxLength = 50000 // 50KB制限
+    
+    if (keywordText.length > maxLength) {
+      console.log(`⚠️ キーワードテキストが長すぎます (${keywordText.length}文字)。切り詰めます。`)
+      // 最初のN個のキーワードだけを使用
+      let truncatedKeywords = []
+      let currentLength = 0
+      for (const keyword of keywords) {
+        if (currentLength + keyword.length + 2 > maxLength) break
+        truncatedKeywords.push(keyword)
+        currentLength += keyword.length + 2 // カンマとスペース
+      }
+      keywordText = truncatedKeywords.join(', ')
+      console.log(`✂️ ${truncatedKeywords.length}個のキーワードに制限 (${keywordText.length}文字)`);
+    }
+    
     return `
 以下は450件のマーケティング動画から抽出された${keywords.length}個のキーワードです。これらを統合・整理して、重複を排除し、最も重要で検索に有用な200個のタグを生成してください。
 
@@ -256,7 +273,7 @@ ${keywordText}
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0)
       .filter(tag => !this.isGenericTag(tag))
-      // No limit - allow all tags from LLM response
+      .slice(0, 300) // 最大300個に制限（通常は200個程度）
     
     console.log(`🏷️ AIから受信したタグ数: ${tags.length}`)
     return tags

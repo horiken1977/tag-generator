@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       
     } else if (mode === 'optimize') {
       // Stage1B: 全体最適化
-      const allKeywords: string[] = body.all_keywords || []
+      let allKeywords: string[] = body.all_keywords || []
       const totalRows = body.total_rows || 0
       
       console.log(`🌐 Stage1B: ${allKeywords.length}個のキーワードから200個のタグを最適化生成`)
@@ -141,6 +141,24 @@ export async function POST(request: NextRequest) {
           success: false,
           error: 'キーワードデータがありません'
         }, { status: 400 })
+      }
+      
+      // キーワード数が多すぎる場合は重複を削除して制限
+      if (allKeywords.length > 10000) {
+        console.log(`⚠️ キーワード数が多すぎます (${allKeywords.length}個)。重複削除と制限を適用します。`)
+        // 重複を削除
+        const uniqueKeywords = [...new Set(allKeywords)]
+        console.log(`📊 重複削除後: ${uniqueKeywords.length}個`)
+        
+        // それでも多い場合は、ランダムサンプリング
+        if (uniqueKeywords.length > 10000) {
+          // シャッフルして最初の10000個を取得
+          const shuffled = uniqueKeywords.sort(() => 0.5 - Math.random())
+          allKeywords = shuffled.slice(0, 10000)
+          console.log(`🎲 ランダムサンプリング後: ${allKeywords.length}個`)
+        } else {
+          allKeywords = uniqueKeywords
+        }
       }
       
       const startTime = Date.now()
