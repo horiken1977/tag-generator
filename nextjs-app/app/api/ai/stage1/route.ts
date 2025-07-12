@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         console.log(`🔄 最後のバッチ処理開始: 蓄積バッチ数=${allBatchTexts.length}, 現在バッチテキスト長=${batchTexts.length}`)
         
         // バッチテキストのサイズ監視
-        const totalBatchTextLength = allBatchTexts.reduce((sum, text) => sum + text.length, 0)
+        const totalBatchTextLength = allBatchTexts.reduce((sum: number, text: string) => sum + text.length, 0)
         console.log(`📊 蓄積バッチテキスト合計: ${totalBatchTextLength}文字`)
         
         const allTexts = [...allBatchTexts, batchTexts].join(' ')
