@@ -52,6 +52,7 @@ export default function Home() {
   const [systemStatus, setSystemStatus] = useState<any>(null)
   const [testingAI, setTestingAI] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, phase: '', details: '' })
+  const [resumeData, setResumeData] = useState<{ keywords: string[], lastIndex: number } | null>(null)
 
   const showStatus = (message: string, type: 'info' | 'success' | 'danger' = 'info') => {
     setStatus({ message, type })
@@ -155,7 +156,7 @@ export default function Home() {
   }
 
   // リトライ機能付きAPI呼び出し
-  const apiCallWithRetry = async (url: string, data: any, maxRetries = 3, timeout = 30000) => {
+  const apiCallWithRetry = async (url: string, data: any, maxRetries = 5, timeout = 45000) => {
     let lastError: any
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -170,8 +171,9 @@ export default function Home() {
           throw error // 最後の試行で失敗したら例外を投げる
         }
         
-        // 指数バックオフでリトライ間隔を調整
-        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
+        // より長い指数バックオフでリトライ間隔を調整
+        const baseDelay = 2000 // 2秒ベース
+        const retryDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000) // 最大30秒
         console.log(`⏳ ${retryDelay}ms後にリトライします...`)
         showStatus(`🔄 接続エラー発生。${retryDelay/1000}秒後にリトライします... (${attempt}/${maxRetries})`, 'info')
         
@@ -194,15 +196,26 @@ export default function Home() {
 
     try {
       // Stage1A: 個別キーワード抽出
-      const allKeywords: string[] = []
+      let allKeywords: string[] = []
+      let startIndex = 0
       const totalRows = currentData.length
       let processedRows = 0
       let totalKeywords = 0
 
-      showStatus(`Stage1A: ${totalRows}行から個別キーワード抽出開始`)
-      setProgress({ current: 0, total: totalRows, phase: 'Stage1A', details: 'キーワード抽出中...' })
+      // 前回の途中データがある場合は継続
+      if (resumeData) {
+        allKeywords = [...resumeData.keywords]
+        startIndex = resumeData.lastIndex
+        totalKeywords = allKeywords.length
+        showStatus(`前回の続きから処理を再開: ${startIndex}行目から開始 (既存キーワード: ${totalKeywords}個)`)
+        console.log(`🔄 処理再開: 行${startIndex}から, 既存キーワード${totalKeywords}個`)
+      } else {
+        showStatus(`Stage1A: ${totalRows}行から個別キーワード抽出開始`)
+      }
+      
+      setProgress({ current: startIndex, total: totalRows, phase: 'Stage1A', details: 'キーワード抽出中...' })
 
-      for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
+      for (let rowIndex = startIndex; rowIndex < totalRows; rowIndex++) {
         const videoData = currentData[rowIndex]
         const progressPercent = Math.round((rowIndex / totalRows) * 100)
         
@@ -230,6 +243,20 @@ export default function Home() {
           processedRows++
           totalKeywords = allKeywords.length
           console.log(`Stage1A: 行${rowIndex + 1}完了 - ${result.keywords.length}個のキーワード抽出 (累計: ${totalKeywords}個)`)
+          
+          // 10行ごとに進捗を保存（再開用）
+          if ((rowIndex + 1) % 10 === 0) {
+            setResumeData({
+              keywords: [...allKeywords],
+              lastIndex: rowIndex + 1
+            })
+            console.log(`💾 進捗保存: 行${rowIndex + 1}, キーワード${totalKeywords}個`)
+          }
+          
+          // サーバー負荷軽減のため、処理間隔を調整
+          if (rowIndex < totalRows - 1) { // 最後の行でない場合のみ
+            await new Promise(resolve => setTimeout(resolve, 500)) // 0.5秒待機
+          }
         } else {
           showStatus(`❌ 行${rowIndex + 1}でエラー: ${result.error}`, 'danger')
           setLoading(false)
@@ -258,6 +285,7 @@ export default function Home() {
       const optimizeResult = optimizeResponse.data
       if (optimizeResult.success) {
         setStage1Results(optimizeResult)
+        setResumeData(null) // 成功時は再開データをクリア
         setProgress({ current: 0, total: 0, phase: '', details: '' }) // 進捗リセット
         const processingTimeText = optimizeResult.processing_time ? 
           ` (最適化時間: ${optimizeResult.processing_time.toFixed(1)}秒)` : ''
@@ -272,6 +300,8 @@ export default function Home() {
         showStatus(`❌ データサイズが大きすぎます`, 'danger')
       } else {
         showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
+        // ネットワークエラーの場合は再開データを保持
+        console.log(`⚠️  エラー発生、再開データを保持中: ${resumeData ? `行${resumeData.lastIndex}, キーワード${resumeData.keywords.length}個` : 'なし'}`)
       }
     } finally {
       setLoading(false)
@@ -559,13 +589,48 @@ export default function Home() {
         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold mb-4">📋 第1段階: タグ候補生成</h2>
           <p className="mb-4">文字起こし列を除外して全動画データを分析し、タグ候補を生成します。</p>
-          <button
-            onClick={executeStage1}
-            disabled={loading || stage1Results !== null}
-            className="px-6 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50"
-          >
-            🚀 タグ候補生成開始
-          </button>
+          
+          {/* 再開データがある場合の表示 */}
+          {resumeData && !stage1Results && (
+            <div className="bg-yellow-500/30 border border-yellow-500/50 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <strong>🔄 中断された処理があります</strong><br />
+                  進捗: {resumeData.lastIndex}/{currentData.length}行 ({Math.round((resumeData.lastIndex / currentData.length) * 100)}%)<br />
+                  収集済みキーワード: {resumeData.keywords.length}個
+                </div>
+                <button
+                  onClick={() => setResumeData(null)}
+                  className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                >
+                  リセット
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex gap-3">
+            <button
+              onClick={executeStage1}
+              disabled={loading || stage1Results !== null}
+              className="px-6 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50"
+            >
+              {resumeData ? '🔄 処理を再開' : '🚀 タグ候補生成開始'}
+            </button>
+            
+            {resumeData && (
+              <button
+                onClick={() => {
+                  setResumeData(null)
+                  showStatus('再開データをリセットしました。最初から処理を開始できます。', 'info')
+                }}
+                disabled={loading}
+                className="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              >
+                🗑️ 最初から開始
+              </button>
+            )}
+          </div>
 
           {stage1Results && (
             <div className="mt-6">
