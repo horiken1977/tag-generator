@@ -141,15 +141,38 @@ export async function POST(request: NextRequest) {
       
       if (isLastBatch) {
         // 最後のバッチ: 全バッチのテキストを結合してタグ生成
+        console.log(`🔄 最後のバッチ処理開始: 蓄積バッチ数=${allBatchTexts.length}, 現在バッチテキスト長=${batchTexts.length}`)
+        
         const allTexts = [...allBatchTexts, batchTexts].join(' ')
-        console.log(`全バッチ完了: 総テキスト長=${allTexts.length}文字, バッチ数=${allBatchTexts.length + 1}`)
+        console.log(`📊 全バッチ完了: 総テキスト長=${allTexts.length}文字, バッチ数=${allBatchTexts.length + 1}`)
+        
+        // メモリとサイズチェック
+        const textSizeMB = allTexts.length / 1024 / 1024
+        console.log(`💾 統合テキストサイズ: ${textSizeMB.toFixed(2)}MB`)
+        
+        if (allTexts.length > 200000) {
+          console.log(`⚠️ テキストサイズ警告: ${allTexts.length}文字は大きすぎる可能性があります`)
+        }
+        
         console.log(`🤖 LLM分析開始: 全${totalDataLength}件のデータを統合分析中...`)
         
         const startTime = Date.now()
-        const keywords = await generateTagCandidates(allTexts)
-        const processingTime = Date.now() - startTime
+        let keywords: string[]
+        let processingTime: number
         
-        console.log(`✅ LLM分析完了: ${keywords.length}個のタグ生成, 処理時間: ${processingTime}ms`)
+        try {
+          keywords = await generateTagCandidates(allTexts)
+          processingTime = Date.now() - startTime
+          
+          console.log(`✅ LLM分析完了: ${keywords.length}個のタグ生成, 処理時間: ${processingTime}ms`)
+        } catch (llmError: any) {
+          console.error(`❌ LLM分析エラー:`, {
+            message: llmError.message,
+            name: llmError.name,
+            textLength: allTexts.length
+          })
+          throw llmError
+        }
         
         return NextResponse.json({
           stage: 1,
