@@ -51,6 +51,7 @@ export default function Home() {
   const [currentStage, setCurrentStage] = useState(0)
   const [systemStatus, setSystemStatus] = useState<any>(null)
   const [testingAI, setTestingAI] = useState(false)
+  const [progress, setProgress] = useState({ current: 0, total: 0, phase: '', details: '' })
 
   const showStatus = (message: string, type: 'info' | 'success' | 'danger' = 'info') => {
     setStatus({ message, type })
@@ -153,6 +154,29 @@ export default function Home() {
     setCurrentStage(1)
   }
 
+  // リトライ機能付きAPI呼び出し
+  const apiCallWithRetry = async (url: string, data: any, maxRetries = 3, timeout = 30000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await axios.post(url, data, { timeout })
+        return response
+      } catch (error: any) {
+        console.log(`❌ API呼び出し失敗 (試行${attempt}/${maxRetries}):`, error.message)
+        
+        if (attempt === maxRetries) {
+          throw error // 最後の試行で失敗したら例外を投げる
+        }
+        
+        // 指数バックオフでリトライ間隔を調整
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
+        console.log(`⏳ ${retryDelay}ms後にリトライします...`)
+        showStatus(`🔄 接続エラー発生。${retryDelay/1000}秒後にリトライします... (${attempt}/${maxRetries})`, 'info')
+        
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
+      }
+    }
+  }
+
   const executeStage1 = async () => {
     if (!currentData.length) {
       showStatus('データを先に読み込んでください', 'danger')
@@ -166,28 +190,40 @@ export default function Home() {
       // Stage1A: 個別キーワード抽出
       const allKeywords: string[] = []
       const totalRows = currentData.length
+      let processedRows = 0
+      let totalKeywords = 0
 
-      showStatus(`Stage1A: ${totalRows}行から個別キーワード抽出中...`)
+      showStatus(`Stage1A: ${totalRows}行から個別キーワード抽出開始`)
+      setProgress({ current: 0, total: totalRows, phase: 'Stage1A', details: 'キーワード抽出中...' })
 
       for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
         const videoData = currentData[rowIndex]
+        const progressPercent = Math.round((rowIndex / totalRows) * 100)
         
-        showStatus(`Stage1A: ${rowIndex + 1}/${totalRows} 行目を分析中... (${Math.round((rowIndex / totalRows) * 100)}%)`)
+        // 進捗状態を更新
+        setProgress({ 
+          current: rowIndex + 1, 
+          total: totalRows, 
+          phase: 'Stage1A', 
+          details: `行${rowIndex + 1}を分析中... (累計${totalKeywords}個キーワード)` 
+        })
+        
+        showStatus(`Stage1A: ${rowIndex + 1}/${totalRows} 行目を分析中... (${progressPercent}% - 累計${totalKeywords}個のキーワード)`)
         
         console.log(`Stage1A: 行${rowIndex + 1}処理開始`)
         
-        const response = await axios.post('/api/ai/stage1', {
+        const response = await apiCallWithRetry('/api/ai/stage1', {
           mode: 'extract',
           video_data: videoData,
           row_index: rowIndex + 1
-        }, {
-          timeout: 30000
         })
         
         const result = response.data
         if (result.success) {
           allKeywords.push(...result.keywords)
-          console.log(`Stage1A: 行${rowIndex + 1}完了 - ${result.keywords.length}個のキーワード抽出`)
+          processedRows++
+          totalKeywords = allKeywords.length
+          console.log(`Stage1A: 行${rowIndex + 1}完了 - ${result.keywords.length}個のキーワード抽出 (累計: ${totalKeywords}個)`)
         } else {
           showStatus(`❌ 行${rowIndex + 1}でエラー: ${result.error}`, 'danger')
           setLoading(false)
@@ -195,28 +231,37 @@ export default function Home() {
         }
       }
 
-      showStatus(`Stage1A完了: ${allKeywords.length}個のキーワードを収集。Stage1B: 全体最適化中...`)
+      showStatus(`🎉 Stage1A完了: ${totalRows}行から${allKeywords.length}個のキーワードを収集！`)
       console.log(`Stage1A完了: 合計${allKeywords.length}個のキーワード収集`)
 
       // Stage1B: 全体最適化
-      const optimizeResponse = await axios.post('/api/ai/stage1', {
+      setProgress({ 
+        current: 1, 
+        total: 1, 
+        phase: 'Stage1B', 
+        details: `${allKeywords.length}個のキーワードから200個の最適タグを生成中...` 
+      })
+      showStatus(`Stage1B: ${allKeywords.length}個のキーワードから200個の最適タグを生成中... (これには少し時間がかかります)`)
+      
+      const optimizeResponse = await apiCallWithRetry('/api/ai/stage1', {
         mode: 'optimize',
         all_keywords: allKeywords,
         total_rows: totalRows
-      }, {
-        timeout: 60000 // 最適化は時間がかかる可能性
-      })
+      }, 3, 60000) // 最適化は時間がかかる可能性があるので60秒タイムアウト
 
       const optimizeResult = optimizeResponse.data
       if (optimizeResult.success) {
         setStage1Results(optimizeResult)
+        setProgress({ current: 0, total: 0, phase: '', details: '' }) // 進捗リセット
         const processingTimeText = optimizeResult.processing_time ? 
           ` (最適化時間: ${optimizeResult.processing_time.toFixed(1)}秒)` : ''
-        showStatus(`✅ ハイブリッド分析完了: ${optimizeResult.candidate_count}個の最適タグを生成しました${processingTimeText}`, 'success')
+        showStatus(`✅ ハイブリッド分析完了: ${totalRows}行 → ${allKeywords.length}個キーワード → ${optimizeResult.candidate_count}個の最適タグを生成${processingTimeText}`, 'success')
       } else {
         showStatus(`❌ Stage1B最適化エラー: ${optimizeResult.error}`, 'danger')
+        setProgress({ current: 0, total: 0, phase: '', details: '' }) // エラー時も進捗リセット
       }
     } catch (error: any) {
+      setProgress({ current: 0, total: 0, phase: '', details: '' }) // エラー時も進捗リセット
       if (error.response?.status === 413) {
         showStatus(`❌ データサイズが大きすぎます`, 'danger')
       } else {
@@ -409,6 +454,27 @@ export default function Home() {
             <div className="text-center">
               <div className="inline-block w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
               <p>{status.message}</p>
+              
+              {/* 進捗バー */}
+              {progress.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-bold">{progress.phase}</span>
+                    <span className="text-sm">{progress.current}/{progress.total}</span>
+                  </div>
+                  <div className="w-full bg-white/20 rounded-full h-4">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-4 rounded-full transition-all duration-300 flex items-center justify-center"
+                      style={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
+                    >
+                      <span className="text-xs text-white font-bold">
+                        {Math.round((progress.current / progress.total) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs mt-2 text-gray-300">{progress.details}</p>
+                </div>
+              )}
             </div>
           ) : (
             <p>{status.message}</p>
