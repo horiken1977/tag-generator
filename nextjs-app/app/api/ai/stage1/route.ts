@@ -38,11 +38,11 @@ function collectBatchTexts(processData: VideoData[]): string {
 async function generateTagCandidates(allText: string): Promise<string[]> {
   console.log(`📊 全テキスト文字数: ${allText.length} (450件の動画データ統合分析)`)
   
-  // 適度な制限を設定（完全無制限ではVercelで問題が起きる可能性）
-  if (allText.length > 80000) {
+  // Vercel制限対応：段階的にサイズを制限
+  if (allText.length > 50000) {
     const originalLength = allText.length
-    allText = allText.slice(0, 80000)
-    console.log(`⚠️ テキストサイズを${originalLength}文字から80000文字に調整しました`)
+    allText = allText.slice(0, 50000)
+    console.log(`⚠️ Vercel制限対応: テキストサイズを${originalLength}文字から50000文字に調整しました`)
   }
 
   // AI API環境変数の詳細チェック
@@ -142,6 +142,10 @@ export async function POST(request: NextRequest) {
       if (isLastBatch) {
         // 最後のバッチ: 全バッチのテキストを結合してタグ生成
         console.log(`🔄 最後のバッチ処理開始: 蓄積バッチ数=${allBatchTexts.length}, 現在バッチテキスト長=${batchTexts.length}`)
+        
+        // バッチテキストのサイズ監視
+        const totalBatchTextLength = allBatchTexts.reduce((sum, text) => sum + text.length, 0)
+        console.log(`📊 蓄積バッチテキスト合計: ${totalBatchTextLength}文字`)
         
         const allTexts = [...allBatchTexts, batchTexts].join(' ')
         console.log(`📊 全バッチ完了: 総テキスト長=${allTexts.length}文字, バッチ数=${allBatchTexts.length + 1}`)
