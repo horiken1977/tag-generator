@@ -20,6 +20,36 @@ export class AIClient {
     
     throw new Error(`Unsupported AI engine: ${engine}`)
   }
+
+  // Stage1A: 軽量キーワード抽出（1行ずつ）
+  async extractKeywordsLight(content: string, engine: string = 'openai'): Promise<string[]> {
+    const prompt = this.buildLightPrompt(content)
+    
+    if (engine === 'openai') {
+      return await this.callOpenAI(prompt)
+    } else if (engine === 'claude') {
+      return await this.callClaude(prompt)
+    } else if (engine === 'gemini') {
+      return await this.callGemini(prompt)
+    }
+    
+    throw new Error(`Unsupported AI engine: ${engine}`)
+  }
+
+  // Stage1B: 全体最適化
+  async optimizeTags(keywords: string[], engine: string = 'openai'): Promise<string[]> {
+    const prompt = this.buildOptimizePrompt(keywords)
+    
+    if (engine === 'openai') {
+      return await this.callOpenAI(prompt)
+    } else if (engine === 'claude') {
+      return await this.callClaude(prompt)
+    } else if (engine === 'gemini') {
+      return await this.callGemini(prompt)
+    }
+    
+    throw new Error(`Unsupported AI engine: ${engine}`)
+  }
   
   private async callOpenAI(content: string): Promise<string[]> {
     const apiKey = process.env.OPENAI_API_KEY
@@ -169,6 +199,53 @@ ${content}
 - 「基本」「応用」「実践」「理論」「概要」「入門」等の抽象表現
 
 出力形式: 具体的で有用なタグのみをカンマ区切りで150-200個出力してください。1行ずつではなく、カンマ区切りで連続して出力してください。
+`
+  }
+
+  // Stage1A: 軽量キーワード抽出用プロンプト
+  private buildLightPrompt(content: string): string {
+    return `
+以下のマーケティング動画の1行データから、重要なキーワードを3-5個抽出してください。
+
+【動画データ】:
+${content}
+
+【抽出基準】:
+- 具体的なツール名・サービス名
+- 業界用語・専門用語
+- 測定指標・KPI名
+- 重要な概念・手法名
+
+【避けるべき語】:
+- 汎用的すぎる語（「方法」「技術」等）
+- 助詞・接続詞
+
+出力: キーワードのみをカンマ区切りで3-5個出力してください。
+`
+  }
+
+  // Stage1B: 全体最適化用プロンプト
+  private buildOptimizePrompt(keywords: string[]): string {
+    const keywordText = keywords.join(', ')
+    return `
+以下は450件のマーケティング動画から抽出された${keywords.length}個のキーワードです。これらを統合・整理して、重複を排除し、最も重要で検索に有用な200個のタグを生成してください。
+
+【収集されたキーワード】:
+${keywordText}
+
+【統合・最適化の指示】:
+1. 同じ概念の異なる表現を統合（例：「デジタルマーケティング」「オンラインマーケティング」→「デジタルマーケティング」）
+2. 重要度と出現頻度を考慮した優先順位付け
+3. 全体のバランスを取り、多様な分野をカバー
+4. 具体性と検索有用性を重視
+
+【出力要求】:
+- 200個の最適化されたタグ
+- 重複なし
+- 具体的で検索に有用
+- カンマ区切りで出力
+
+出力: 最適化された200個のタグをカンマ区切りで出力してください。
 `
   }
   

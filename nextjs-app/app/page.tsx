@@ -160,59 +160,65 @@ export default function Home() {
     }
 
     setLoading(true)
-    showStatus('第1段階: タグ候補を生成中...')
+    showStatus('第1段階: ハイブリッド方式でタグ候補を生成中...')
 
     try {
-      const batchSize = 100
-      const totalBatches = Math.ceil(currentData.length / batchSize)
-      const allBatchTexts: string[] = []
+      // Stage1A: 個別キーワード抽出
+      const allKeywords: string[] = []
+      const totalRows = currentData.length
 
-      showStatus(`第1段階: ${currentData.length}件を${totalBatches}バッチで処理中...`)
+      showStatus(`Stage1A: ${totalRows}行から個別キーワード抽出中...`)
 
-      // バッチごとに処理
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-        showStatus(`第1段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
+      for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
+        const videoData = currentData[rowIndex]
         
-        // このバッチで処理するデータの範囲を計算
-        const startIdx = batchIndex * batchSize
-        const endIdx = Math.min(startIdx + batchSize, currentData.length)
-        const batchData = currentData.slice(startIdx, endIdx)
+        showStatus(`Stage1A: ${rowIndex + 1}/${totalRows} 行目を分析中... (${Math.round((rowIndex / totalRows) * 100)}%)`)
         
-        console.log(`クライアント: バッチ${batchIndex}送信, 範囲=${startIdx}-${endIdx}, バッチ件数=${batchData.length}, 蓄積テキスト数=${allBatchTexts.length}`)
+        console.log(`Stage1A: 行${rowIndex + 1}処理開始`)
         
         const response = await axios.post('/api/ai/stage1', {
-          data: batchData,
-          batch_index: batchIndex,
-          batch_size: batchSize,
-          all_batch_texts: allBatchTexts,
-          total_data_length: currentData.length // 総件数を追加
+          mode: 'extract',
+          video_data: videoData,
+          row_index: rowIndex + 1
         }, {
           timeout: 30000
         })
         
-        const batchResult = response.data
-        if (batchResult.success) {
-          if (batchResult.batch_info.is_last_batch) {
-            // 最後のバッチ: タグ候補が生成された
-            setStage1Results(batchResult)
-            const processingTimeText = batchResult.processing_time ? 
-              ` (処理時間: ${batchResult.processing_time.toFixed(1)}秒)` : ''
-            showStatus(`✅ 全${currentData.length}件の分析完了: ${batchResult.candidate_count}個のタグ候補を生成しました${processingTimeText}`, 'success')
-            // 第2段階には自動で進まない
-          } else {
-            // 中間バッチ: テキストを蓄積
-            allBatchTexts.push(batchResult.batch_text)
-            showStatus(`第1段階: バッチ ${batchIndex + 1}/${totalBatches} 完了 - データ収集中...`)
-          }
+        const result = response.data
+        if (result.success) {
+          allKeywords.push(...result.keywords)
+          console.log(`Stage1A: 行${rowIndex + 1}完了 - ${result.keywords.length}個のキーワード抽出`)
         } else {
-          showStatus(`❌ バッチ${batchIndex + 1}でエラー: ${batchResult.error}`, 'danger')
+          showStatus(`❌ 行${rowIndex + 1}でエラー: ${result.error}`, 'danger')
           setLoading(false)
           return
         }
       }
+
+      showStatus(`Stage1A完了: ${allKeywords.length}個のキーワードを収集。Stage1B: 全体最適化中...`)
+      console.log(`Stage1A完了: 合計${allKeywords.length}個のキーワード収集`)
+
+      // Stage1B: 全体最適化
+      const optimizeResponse = await axios.post('/api/ai/stage1', {
+        mode: 'optimize',
+        all_keywords: allKeywords,
+        total_rows: totalRows
+      }, {
+        timeout: 60000 // 最適化は時間がかかる可能性
+      })
+
+      const optimizeResult = optimizeResponse.data
+      if (optimizeResult.success) {
+        setStage1Results(optimizeResult)
+        const processingTimeText = optimizeResult.processing_time ? 
+          ` (最適化時間: ${optimizeResult.processing_time.toFixed(1)}秒)` : ''
+        showStatus(`✅ ハイブリッド分析完了: ${optimizeResult.candidate_count}個の最適タグを生成しました${processingTimeText}`, 'success')
+      } else {
+        showStatus(`❌ Stage1B最適化エラー: ${optimizeResult.error}`, 'danger')
+      }
     } catch (error: any) {
       if (error.response?.status === 413) {
-        showStatus(`❌ データサイズが大きすぎます。バッチサイズを調整してください`, 'danger')
+        showStatus(`❌ データサイズが大きすぎます`, 'danger')
       } else {
         showStatus(`❌ 接続エラー: ${error.message}`, 'danger')
       }
