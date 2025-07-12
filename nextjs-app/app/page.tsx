@@ -156,11 +156,14 @@ export default function Home() {
 
   // リトライ機能付きAPI呼び出し
   const apiCallWithRetry = async (url: string, data: any, maxRetries = 3, timeout = 30000) => {
+    let lastError: any
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await axios.post(url, data, { timeout })
         return response
       } catch (error: any) {
+        lastError = error
         console.log(`❌ API呼び出し失敗 (試行${attempt}/${maxRetries}):`, error.message)
         
         if (attempt === maxRetries) {
@@ -175,6 +178,9 @@ export default function Home() {
         await new Promise(resolve => setTimeout(resolve, retryDelay))
       }
     }
+    
+    // 型安全性のため、ここには到達しないがTypeScript用に例外を投げる
+    throw lastError || new Error('Unexpected error in retry logic')
   }
 
   const executeStage1 = async () => {
