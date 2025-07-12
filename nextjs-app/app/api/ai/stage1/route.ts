@@ -3,7 +3,7 @@ import { AIClient } from '@/lib/ai-client'
 
 // Vercelのボディサイズ制限とタイムアウト設定
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60 // 60秒に延長してLLM処理時間を確保
 
 interface VideoData {
   title?: string
@@ -37,6 +37,13 @@ function collectBatchTexts(processData: VideoData[]): string {
 
 async function generateTagCandidates(allText: string): Promise<string[]> {
   console.log(`📊 全テキスト文字数: ${allText.length} (450件の動画データ統合分析)`)
+  
+  // 適度な制限を設定（完全無制限ではVercelで問題が起きる可能性）
+  if (allText.length > 80000) {
+    const originalLength = allText.length
+    allText = allText.slice(0, 80000)
+    console.log(`⚠️ テキストサイズを${originalLength}文字から80000文字に調整しました`)
+  }
 
   // AI API環境変数の詳細チェック
   const hasOpenAI = !!process.env.OPENAI_API_KEY
@@ -98,6 +105,7 @@ async function generateTagCandidates(allText: string): Promise<string[]> {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 Stage1 API開始')
   try {
     const body = await request.json()
     const videoData: VideoData[] = body.data || []
@@ -105,6 +113,8 @@ export async function POST(request: NextRequest) {
     const batchSize = body.batch_size || 100
     const allBatchTexts = body.all_batch_texts || []
     const totalDataLength = body.total_data_length || videoData.length
+    
+    console.log(`📊 リクエスト解析: videoData=${videoData.length}件, batchIndex=${batchIndex}, totalDataLength=${totalDataLength}`)
     
     if (!videoData.length) {
       return NextResponse.json({
@@ -185,10 +195,20 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
 
   } catch (error: any) {
-    console.error('Stage1 API error:', error)
+    console.error('❌ Stage1 API error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause
+    })
     return NextResponse.json({
       success: false,
       error: `第1段階処理エラー: ${error.message}`,
+      error_details: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500)
+      },
       stage: 1
     }, { status: 500 })
   }
