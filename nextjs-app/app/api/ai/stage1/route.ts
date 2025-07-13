@@ -71,7 +71,9 @@ async function extractKeywordsFromSingleRow(videoData: VideoData): Promise<strin
 
 // Stage1B: 全体最適化（収集したキーワードから200個のタグ生成）
 async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
-  console.log(`🌐 全体最適化開始: ${allKeywords.length}個のキーワードから200個のタグを生成`)
+  const functionStartTime = Date.now()
+  const functionId = Math.random().toString(36).substr(2, 6)
+  console.log(`🌐 [${functionId}] 全体最適化開始: ${allKeywords.length}個のキーワードから200個のタグを生成`)
 
   // AI API環境変数チェック
   const hasOpenAI = !!process.env.OPENAI_API_KEY
@@ -87,7 +89,7 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
   
   // 大量キーワードの場合は多段階で処理
   if (allKeywords.length > 5000) {
-    console.log(`📊 大量キーワード検出: ${allKeywords.length}個 → 超効率多段階処理を開始`)
+    console.log(`📊 [${functionId}] 大量キーワード検出: ${allKeywords.length}個 → 超効率多段階処理を開始`)
     
     // Step 1: 効率的な頻度分析とメモリ最適化
     const frequencyMap = new Map<string, number>()
@@ -120,21 +122,27 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
       batches.push(sortedKeywords.slice(i, i + batchSize))
     }
     
-    console.log(`🔄 Step 2: ${batches.length}個の小バッチに分割`)
+    console.log(`🔄 [${functionId}] Step 2: ${batches.length}個の小バッチに分割`)
     
     const intermediateResults: string[] = []
     for (let i = 0; i < batches.length; i++) {
       try {
-        console.log(`   バッチ ${i + 1}/${batches.length} 処理中... (${batches[i].length}個)`)
+        const batchStartTime = Date.now()
+        console.log(`   [${functionId}] バッチ ${i + 1}/${batches.length} 開始... (${batches[i].length}個) - ${new Date().toISOString()}`)
+        
         const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
+        const batchTime = Date.now() - batchStartTime
+        
         intermediateResults.push(...batchResults.slice(0, 30)) // 各バッチから最大30個に制限
+        console.log(`   ✅ [${functionId}] バッチ ${i + 1} 完了: ${batchResults.length}個→${Math.min(batchResults.length, 30)}個選択, ${batchTime}ms`)
         
         // バッチ間に短い待機時間を追加（API制限対策）
         if (i < batches.length - 1) {
+          console.log(`   ⏳ [${functionId}] バッチ間待機: 500ms`)
           await new Promise(resolve => setTimeout(resolve, 500))
         }
       } catch (batchError: any) {
-        console.error(`❌ バッチ ${i + 1} エラー:`, batchError.message)
+        console.error(`❌ [${functionId}] バッチ ${i + 1} エラー:`, batchError.message)
         // バッチエラーでも処理を継続
         continue
       }
@@ -166,9 +174,15 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 Stage1 ハイブリッド処理開始')
+  const requestStartTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
+  console.log(`🚀 [${requestId}] Stage1 ハイブリッド処理開始 - ${new Date().toISOString()}`)
+  
   try {
+    const bodyParseStart = Date.now()
     const body = await request.json()
+    const bodyParseTime = Date.now() - bodyParseStart
+    console.log(`📄 [${requestId}] リクエストボディ解析完了: ${bodyParseTime}ms`)
     const mode = body.mode // 'extract' または 'optimize'
     
     if (mode === 'extract') {
@@ -204,7 +218,8 @@ export async function POST(request: NextRequest) {
       let allKeywords: string[] = body.all_keywords || []
       const totalRows = body.total_rows || 0
       
-      console.log(`🌐 Stage1B: ${allKeywords.length}個のキーワードから200個のタグを最適化生成`)
+      console.log(`🌐 [${requestId}] Stage1B開始: ${allKeywords.length}個のキーワードから200個のタグを最適化生成`)
+      console.log(`📊 [${requestId}] 入力データ詳細: 総行数=${totalRows}, キーワード数=${allKeywords.length}, 最初の5キーワード=[${allKeywords.slice(0, 5).join(', ')}]`)
       
       if (!allKeywords.length) {
         return NextResponse.json({
@@ -215,11 +230,17 @@ export async function POST(request: NextRequest) {
       
       // 基本的な重複削除と事前フィルタリング（メモリ効率化）
       const originalCount = allKeywords.length
-      console.log(`🔍 事前処理開始: ${originalCount}個のキーワード`)
+      const preprocessStart = Date.now()
+      console.log(`🔍 [${requestId}] 事前処理開始: ${originalCount}個のキーワード`)
       
       // メモリ効率的な重複削除とフィルタリング
       const uniqueKeywords = new Set<string>()
+      let processedCount = 0
       allKeywords.forEach(keyword => {
+        processedCount++
+        if (processedCount % 10000 === 0) {
+          console.log(`   [${requestId}] 事前処理進捗: ${processedCount}/${originalCount} (${((processedCount/originalCount)*100).toFixed(1)}%)`)
+        }
         const normalized = keyword?.toLowerCase()?.trim()
         if (normalized && normalized.length >= 2) {
           uniqueKeywords.add(normalized)
@@ -228,23 +249,28 @@ export async function POST(request: NextRequest) {
       
       allKeywords = Array.from(uniqueKeywords)
       const dedupedCount = allKeywords.length
+      const preprocessTime = Date.now() - preprocessStart
       
-      console.log(`📊 事前処理完了: ${originalCount}個 → ${dedupedCount}個 (重複削除 + フィルタリング)`)
+      console.log(`📊 [${requestId}] 事前処理完了: ${originalCount}個 → ${dedupedCount}個 (重複削除 + フィルタリング) - ${preprocessTime}ms`)
       
       // 巨大データセットの場合はさらなる事前削減
       if (allKeywords.length > 80000) {
-        console.log(`⚠️  超大量データセット検出: ${allKeywords.length}個 → 事前削減を実施`)
+        console.log(`⚠️  [${requestId}] 超大量データセット検出: ${allKeywords.length}個 → 事前削減を実施`)
         allKeywords = allKeywords.slice(0, 80000)
-        console.log(`📉 事前削減完了: ${allKeywords.length}個に制限`)
+        console.log(`📉 [${requestId}] 事前削減完了: ${allKeywords.length}個に制限`)
       }
       
       const startTime = Date.now()
       let optimizedTags: string[] = []
       
       try {
+        console.log(`🎯 [${requestId}] optimizeGlobalTags呼び出し開始: ${allKeywords.length}個`)
+        const optimizeStart = Date.now()
         optimizedTags = await optimizeGlobalTags(allKeywords)
+        const optimizeTime = Date.now() - optimizeStart
+        console.log(`✅ [${requestId}] optimizeGlobalTags完了: ${optimizeTime}ms`)
       } catch (optimizeError: any) {
-        console.error(`❌ 最適化エラー: ${optimizeError.message}`)
+        console.error(`❌ [${requestId}] 最適化エラー: ${optimizeError.message}`)
         
         // フォールバック: 頻度ベースの簡易タグ生成
         console.log(`🔄 フォールバック処理: 頻度ベースタグ生成`)
@@ -265,6 +291,9 @@ export async function POST(request: NextRequest) {
       }
       
       const processingTime = Date.now() - startTime
+      const totalRequestTime = Date.now() - requestStartTime
+      
+      console.log(`🏁 [${requestId}] Stage1B完了: 処理時間=${processingTime}ms, 総リクエスト時間=${totalRequestTime}ms, タグ数=${optimizedTags.length}`)
       
       return NextResponse.json({
         stage: '1B',
