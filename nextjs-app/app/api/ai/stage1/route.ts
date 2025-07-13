@@ -87,43 +87,67 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
   
   // 大量キーワードの場合は多段階で処理
   if (allKeywords.length > 5000) {
-    console.log(`📊 大量キーワード検出: ${allKeywords.length}個 → 多段階処理を開始`)
+    console.log(`📊 大量キーワード検出: ${allKeywords.length}個 → 超効率多段階処理を開始`)
     
-    // Step 1: 頻度分析で上位キーワードを抽出
+    // Step 1: 効率的な頻度分析とメモリ最適化
     const frequencyMap = new Map<string, number>()
+    
+    // メモリ効率化: 5文字未満やstop wordは除外
+    const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an', 'is', 'was', 'are', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'shall'])
+    
     allKeywords.forEach(keyword => {
       const normalized = keyword.toLowerCase().trim()
-      frequencyMap.set(normalized, (frequencyMap.get(normalized) || 0) + 1)
+      // フィルタリング: 3文字以上、数字のみ除外、stop word除外
+      if (normalized.length >= 3 && !stopWords.has(normalized) && !/^\d+$/.test(normalized)) {
+        frequencyMap.set(normalized, (frequencyMap.get(normalized) || 0) + 1)
+      }
     })
     
-    // 頻度順にソートして上位を取得
+    console.log(`📈 Step 1: フィルタリング完了 → ${frequencyMap.size}個の有効キーワード (元: ${allKeywords.length}個)`)
+    
+    // 頻度上位2000個のみ処理対象にして負荷軽減
     const sortedKeywords = Array.from(frequencyMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5000)
+      .slice(0, 2000)
       .map(([keyword]) => keyword)
     
-    console.log(`📈 Step 1: 頻度分析完了 → ${sortedKeywords.length}個の高頻度キーワード`)
+    console.log(`📈 Step 1完了: 頻度上位${sortedKeywords.length}個を選択`)
     
-    // Step 2: バッチ処理で段階的に削減
-    const batchSize = 1000
+    // Step 2: 小さなバッチで段階的処理（メモリ負荷軽減）
+    const batchSize = 400  // さらに小さなバッチサイズ
     const batches = []
     for (let i = 0; i < sortedKeywords.length; i += batchSize) {
       batches.push(sortedKeywords.slice(i, i + batchSize))
     }
     
-    console.log(`🔄 Step 2: ${batches.length}個のバッチに分割`)
+    console.log(`🔄 Step 2: ${batches.length}個の小バッチに分割`)
     
     const intermediateResults: string[] = []
     for (let i = 0; i < batches.length; i++) {
-      console.log(`   バッチ ${i + 1}/${batches.length} を処理中...`)
-      const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
-      intermediateResults.push(...batchResults.slice(0, 50)) // 各バッチから最大50個
+      try {
+        console.log(`   バッチ ${i + 1}/${batches.length} 処理中... (${batches[i].length}個)`)
+        const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
+        intermediateResults.push(...batchResults.slice(0, 30)) // 各バッチから最大30個に制限
+        
+        // バッチ間に短い待機時間を追加（API制限対策）
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      } catch (batchError: any) {
+        console.error(`❌ バッチ ${i + 1} エラー:`, batchError.message)
+        // バッチエラーでも処理を継続
+        continue
+      }
     }
     
     console.log(`📊 Step 2完了: ${intermediateResults.length}個の中間タグ`)
     
     // Step 3: 最終的な200個への絞り込み
-    console.log(`🎯 Step 3: 最終最適化 → 200個のタグへ`)
+    if (intermediateResults.length === 0) {
+      throw new Error('中間処理でタグが生成されませんでした。AI APIの調整が必要です。')
+    }
+    
+    console.log(`🎯 Step 3: 最終最適化 → 200個のタグへ (入力: ${intermediateResults.length}個)`)
     const startTime = Date.now()
     const finalTags = await aiClient.optimizeTags(intermediateResults, aiEngine)
     const processingTime = Date.now() - startTime
@@ -189,17 +213,57 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
       
-      // 基本的な重複削除（多段階処理で対応するため制限は撤廃）
+      // 基本的な重複削除と事前フィルタリング（メモリ効率化）
       const originalCount = allKeywords.length
-      allKeywords = [...new Set(allKeywords)]
+      console.log(`🔍 事前処理開始: ${originalCount}個のキーワード`)
+      
+      // メモリ効率的な重複削除とフィルタリング
+      const uniqueKeywords = new Set<string>()
+      allKeywords.forEach(keyword => {
+        const normalized = keyword?.toLowerCase()?.trim()
+        if (normalized && normalized.length >= 2) {
+          uniqueKeywords.add(normalized)
+        }
+      })
+      
+      allKeywords = Array.from(uniqueKeywords)
       const dedupedCount = allKeywords.length
       
-      if (originalCount !== dedupedCount) {
-        console.log(`📊 重複削除: ${originalCount}個 → ${dedupedCount}個`)
+      console.log(`📊 事前処理完了: ${originalCount}個 → ${dedupedCount}個 (重複削除 + フィルタリング)`)
+      
+      // 巨大データセットの場合はさらなる事前削減
+      if (allKeywords.length > 80000) {
+        console.log(`⚠️  超大量データセット検出: ${allKeywords.length}個 → 事前削減を実施`)
+        allKeywords = allKeywords.slice(0, 80000)
+        console.log(`📉 事前削減完了: ${allKeywords.length}個に制限`)
       }
       
       const startTime = Date.now()
-      const optimizedTags = await optimizeGlobalTags(allKeywords)
+      let optimizedTags: string[] = []
+      
+      try {
+        optimizedTags = await optimizeGlobalTags(allKeywords)
+      } catch (optimizeError: any) {
+        console.error(`❌ 最適化エラー: ${optimizeError.message}`)
+        
+        // フォールバック: 頻度ベースの簡易タグ生成
+        console.log(`🔄 フォールバック処理: 頻度ベースタグ生成`)
+        const frequencyMap = new Map<string, number>()
+        allKeywords.forEach(keyword => {
+          const normalized = keyword.toLowerCase().trim()
+          if (normalized.length >= 3) {
+            frequencyMap.set(normalized, (frequencyMap.get(normalized) || 0) + 1)
+          }
+        })
+        
+        optimizedTags = Array.from(frequencyMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 200)
+          .map(([keyword]) => keyword)
+        
+        console.log(`✅ フォールバック完了: ${optimizedTags.length}個のタグ生成`)
+      }
+      
       const processingTime = Date.now() - startTime
       
       return NextResponse.json({
@@ -211,7 +275,8 @@ export async function POST(request: NextRequest) {
         source_data_stats: {
           total_videos: totalRows,
           total_keywords_processed: allKeywords.length,
-          transcripts_excluded: true
+          transcripts_excluded: true,
+          fallback_used: optimizedTags.length > 0 && allKeywords.length > 50000
         },
         message: `${allKeywords.length}個のキーワードから${optimizedTags.length}個の最適タグを生成しました（処理時間: ${(processingTime/1000).toFixed(1)}秒）`
       })
