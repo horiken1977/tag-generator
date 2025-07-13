@@ -115,8 +115,8 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
     
     console.log(`📈 Step 1完了: 頻度上位${sortedKeywords.length}個を選択`)
     
-    // Step 2: 小さなバッチで段階的処理（メモリ負荷軽減）
-    const batchSize = 200  // 処理時間短縮のため400→200に削減
+    // Step 2: 大きなバッチで処理回数削減（API呼び出し回数最小化）
+    const batchSize = 600  // API呼び出し回数削減のため200→600に拡大
     const batches = []
     for (let i = 0; i < sortedKeywords.length; i += batchSize) {
       batches.push(sortedKeywords.slice(i, i + batchSize))
@@ -133,13 +133,13 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
         const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
         const batchTime = Date.now() - batchStartTime
         
-        intermediateResults.push(...batchResults.slice(0, 20)) // 各バッチから最大20個に制限（バッチ数増加のため調整）
-        console.log(`   ✅ [${functionId}] バッチ ${i + 1} 完了: ${batchResults.length}個→${Math.min(batchResults.length, 20)}個選択, ${batchTime}ms`)
+        intermediateResults.push(...batchResults.slice(0, 50)) // 各バッチから最大50個に制限（バッチ数減少のため増加）
+        console.log(`   ✅ [${functionId}] バッチ ${i + 1} 完了: ${batchResults.length}個→${Math.min(batchResults.length, 50)}個選択, ${batchTime}ms`)
         
         // バッチ間に短い待機時間を追加（API制限対策）
         if (i < batches.length - 1) {
-          console.log(`   ⏳ [${functionId}] バッチ間待機: 300ms`)
-          await new Promise(resolve => setTimeout(resolve, 300))
+          console.log(`   ⏳ [${functionId}] バッチ間待機: 200ms`)
+          await new Promise(resolve => setTimeout(resolve, 200))
         }
       } catch (batchError: any) {
         console.error(`❌ [${functionId}] バッチ ${i + 1} エラー:`, batchError.message)
