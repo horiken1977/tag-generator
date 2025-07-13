@@ -307,7 +307,7 @@ export default function Home() {
         mode: 'optimize',
         all_keywords: allKeywords,
         total_rows: totalRows
-      }, 3, 60000) // 最適化は時間がかかる可能性があるので60秒タイムアウト
+      }, 3, 150000) // 最適化は時間がかかる可能性があるので150秒タイムアウト（85-116秒の処理時間に対応）
 
       const optimizeResult = optimizeResponse.data
       if (optimizeResult.success) {
