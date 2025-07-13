@@ -52,7 +52,7 @@ export default function Home() {
   const [systemStatus, setSystemStatus] = useState<any>(null)
   const [testingAI, setTestingAI] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, phase: '', details: '' })
-  const [resumeData, setResumeData] = useState<{ keywords: string[], lastIndex: number } | null>(null)
+  const [resumeData, setResumeData] = useState<{ keywords: string[], lastIndex: number, timestamp?: string } | null>(null)
 
   const showStatus = (message: string, type: 'info' | 'success' | 'danger' = 'info') => {
     setStatus({ message, type })
@@ -71,6 +71,18 @@ export default function Home() {
   // コンポーネント読み込み時にシステム状態をチェック
   useEffect(() => {
     checkSystemStatus()
+    
+    // ローカルストレージから再開データを復元
+    const savedResumeData = localStorage.getItem('stage1_resume_data')
+    if (savedResumeData) {
+      try {
+        const parsed = JSON.parse(savedResumeData)
+        setResumeData(parsed)
+        console.log(`💾 保存された進捗を復元: 行${parsed.lastIndex}, キーワード${parsed.keywords.length}個`)
+      } catch (error) {
+        console.error('再開データの復元エラー:', error)
+      }
+    }
   }, [])
 
   const testAIConnection = async () => {
@@ -246,10 +258,15 @@ export default function Home() {
           
           // 10行ごとに進捗を保存（再開用）
           if ((rowIndex + 1) % 10 === 0) {
-            setResumeData({
+            const resumeInfo = {
               keywords: [...allKeywords],
-              lastIndex: rowIndex + 1
-            })
+              lastIndex: rowIndex + 1,
+              timestamp: new Date().toISOString()
+            }
+            setResumeData(resumeInfo)
+            
+            // ローカルストレージにも保存
+            localStorage.setItem('stage1_resume_data', JSON.stringify(resumeInfo))
             console.log(`💾 進捗保存: 行${rowIndex + 1}, キーワード${totalKeywords}個`)
           }
           
@@ -266,6 +283,16 @@ export default function Home() {
 
       showStatus(`🎉 Stage1A完了: ${totalRows}行から${allKeywords.length}個のキーワードを収集！`)
       console.log(`Stage1A完了: 合計${allKeywords.length}個のキーワード収集`)
+      
+      // 完成したキーワードをローカルストレージに保存
+      const completeData = {
+        keywords: [...allKeywords],
+        totalRows: totalRows,
+        completedAt: new Date().toISOString(),
+        success: true
+      }
+      localStorage.setItem('stage1_complete_data', JSON.stringify(completeData))
+      console.log(`✅ 全キーワードをローカルストレージに保存しました`)
 
       // Stage1B: 全体最適化
       setProgress({ 
@@ -286,6 +313,7 @@ export default function Home() {
       if (optimizeResult.success) {
         setStage1Results(optimizeResult)
         setResumeData(null) // 成功時は再開データをクリア
+        localStorage.removeItem('stage1_resume_data') // 再開データも削除
         setProgress({ current: 0, total: 0, phase: '', details: '' }) // 進捗リセット
         const processingTimeText = optimizeResult.processing_time ? 
           ` (最適化時間: ${optimizeResult.processing_time.toFixed(1)}秒)` : ''
@@ -622,6 +650,8 @@ export default function Home() {
               <button
                 onClick={() => {
                   setResumeData(null)
+                  localStorage.removeItem('stage1_resume_data')
+                  localStorage.removeItem('stage1_complete_data')
                   showStatus('再開データをリセットしました。最初から処理を開始できます。', 'info')
                 }}
                 disabled={loading}
