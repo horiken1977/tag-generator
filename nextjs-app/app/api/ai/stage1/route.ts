@@ -3,7 +3,7 @@ import { AIClient } from '@/lib/ai-client'
 
 // Vercelのボディサイズ制限とタイムアウト設定
 export const runtime = 'nodejs'
-export const maxDuration = 60 // 60秒に延長してLLM処理時間を確保
+export const maxDuration = 300 // 300秒（5分）に延長して大量キーワード処理に対応
 
 interface VideoData {
   title?: string
@@ -82,17 +82,63 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
     throw new Error('AI APIキーが設定されていません。')
   }
 
-  const startTime = Date.now()
   const aiClient = new AIClient()
   const aiEngine = hasOpenAI ? 'openai' : hasClaude ? 'claude' : 'gemini'
   
-  // キーワードを統合して最適なタグ生成
-  const optimizedTags = await aiClient.optimizeTags(allKeywords, aiEngine)
-  
-  const processingTime = Date.now() - startTime
-  console.log(`✅ 全体最適化完了: ${optimizedTags.length}個のタグ, 処理時間: ${processingTime}ms`)
-
-  return optimizedTags
+  // 大量キーワードの場合は多段階で処理
+  if (allKeywords.length > 5000) {
+    console.log(`📊 大量キーワード検出: ${allKeywords.length}個 → 多段階処理を開始`)
+    
+    // Step 1: 頻度分析で上位キーワードを抽出
+    const frequencyMap = new Map<string, number>()
+    allKeywords.forEach(keyword => {
+      const normalized = keyword.toLowerCase().trim()
+      frequencyMap.set(normalized, (frequencyMap.get(normalized) || 0) + 1)
+    })
+    
+    // 頻度順にソートして上位を取得
+    const sortedKeywords = Array.from(frequencyMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5000)
+      .map(([keyword]) => keyword)
+    
+    console.log(`📈 Step 1: 頻度分析完了 → ${sortedKeywords.length}個の高頻度キーワード`)
+    
+    // Step 2: バッチ処理で段階的に削減
+    const batchSize = 1000
+    const batches = []
+    for (let i = 0; i < sortedKeywords.length; i += batchSize) {
+      batches.push(sortedKeywords.slice(i, i + batchSize))
+    }
+    
+    console.log(`🔄 Step 2: ${batches.length}個のバッチに分割`)
+    
+    const intermediateResults: string[] = []
+    for (let i = 0; i < batches.length; i++) {
+      console.log(`   バッチ ${i + 1}/${batches.length} を処理中...`)
+      const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
+      intermediateResults.push(...batchResults.slice(0, 50)) // 各バッチから最大50個
+    }
+    
+    console.log(`📊 Step 2完了: ${intermediateResults.length}個の中間タグ`)
+    
+    // Step 3: 最終的な200個への絞り込み
+    console.log(`🎯 Step 3: 最終最適化 → 200個のタグへ`)
+    const startTime = Date.now()
+    const finalTags = await aiClient.optimizeTags(intermediateResults, aiEngine)
+    const processingTime = Date.now() - startTime
+    
+    console.log(`✅ 多段階最適化完了: ${finalTags.length}個のタグ, 最終処理時間: ${processingTime}ms`)
+    return finalTags
+    
+  } else {
+    // 通常の処理
+    const startTime = Date.now()
+    const optimizedTags = await aiClient.optimizeTags(allKeywords, aiEngine)
+    const processingTime = Date.now() - startTime
+    console.log(`✅ 全体最適化完了: ${optimizedTags.length}個のタグ, 処理時間: ${processingTime}ms`)
+    return optimizedTags
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -143,22 +189,13 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
       
-      // キーワード数が多すぎる場合は重複を削除して制限
-      if (allKeywords.length > 10000) {
-        console.log(`⚠️ キーワード数が多すぎます (${allKeywords.length}個)。重複削除と制限を適用します。`)
-        // 重複を削除
-        const uniqueKeywords = [...new Set(allKeywords)]
-        console.log(`📊 重複削除後: ${uniqueKeywords.length}個`)
-        
-        // それでも多い場合は、ランダムサンプリング
-        if (uniqueKeywords.length > 10000) {
-          // シャッフルして最初の10000個を取得
-          const shuffled = uniqueKeywords.sort(() => 0.5 - Math.random())
-          allKeywords = shuffled.slice(0, 10000)
-          console.log(`🎲 ランダムサンプリング後: ${allKeywords.length}個`)
-        } else {
-          allKeywords = uniqueKeywords
-        }
+      // 基本的な重複削除（多段階処理で対応するため制限は撤廃）
+      const originalCount = allKeywords.length
+      allKeywords = [...new Set(allKeywords)]
+      const dedupedCount = allKeywords.length
+      
+      if (originalCount !== dedupedCount) {
+        console.log(`📊 重複削除: ${originalCount}個 → ${dedupedCount}個`)
       }
       
       const startTime = Date.now()
