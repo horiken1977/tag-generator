@@ -106,9 +106,14 @@ async function extractKeywordsFromSingleRow(videoData: VideoData, preferredEngin
     }
   }
   
-  // 全エンジンが失敗した場合
+  // 全エンジンが本当にエラーで失敗した場合のみエラーを投げる
+  if (keywords.length === 0 && lastError) {
+    throw new Error(`全てのAIエンジンで失敗しました。最後のエラー: ${lastError.message}`)
+  }
+  
+  // エラーはないが0個の場合は警告のみ（AIが有効なキーワードを見つけられなかった）
   if (keywords.length === 0) {
-    throw new Error(`全てのAIエンジンで失敗しました。最後のエラー: ${lastError?.message || 'Unknown error'}`)
+    console.log(`⚠️ 警告: AIは正常に応答しましたが、有効なキーワードを抽出できませんでした`)
   }
   
   const processingTime = Date.now() - startTime

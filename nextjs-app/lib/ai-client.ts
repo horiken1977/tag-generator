@@ -151,13 +151,25 @@ export class AIClient {
     })
     
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status}`)
+      const errorText = await response.text()
+      console.error(`❌ Claude API HTTP error: ${response.status}`)
+      console.error(`Error body:`, errorText)
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`)
     }
     
     const data = await response.json()
     const result = data.content[0]?.text || ''
     
-    return this.parseTagsFromResponse(result)
+    console.log(`🤖 Claude API応答 (${promptType}): "${result}"`)
+    
+    const tags = this.parseTagsFromResponse(result)
+    
+    // デバッグ用：parseTagsFromResponseの前後を確認
+    if (tags.length === 0 && result.length > 0) {
+      console.log(`⚠️ Claude応答はあったが、タグが0個になりました。応答内容: "${result}"`)
+    }
+    
+    return tags
   }
   
   private async callGemini(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
@@ -302,15 +314,21 @@ ${keywordText}
   
   private parseTagsFromResponse(response: string): string[] {
     // Extract tags from AI response - expecting 150-200 tags
-    const tags = response
-      .split(/[,\n]/)
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0)
-      .filter(tag => !this.isGenericTag(tag))
-      .slice(0, 300) // 最大300個に制限（通常は200個程度）
+    const splitTags = response.split(/[,\n]/)
+    const trimmedTags = splitTags.map(tag => tag.trim())
+    const nonEmptyTags = trimmedTags.filter(tag => tag.length > 0)
+    const filteredTags = nonEmptyTags.filter(tag => !this.isGenericTag(tag))
+    const finalTags = filteredTags.slice(0, 300) // 最大300個に制限（通常は200個程度）
     
-    console.log(`🏷️ AIから受信したタグ数: ${tags.length}`)
-    return tags
+    console.log(`🏷️ タグ解析詳細: 分割=${splitTags.length}, 空除去=${nonEmptyTags.length}, 汎用語除去=${filteredTags.length}, 最終=${finalTags.length}`)
+    
+    // デバッグ：汎用語としてフィルタされたタグを表示
+    if (nonEmptyTags.length > filteredTags.length) {
+      const genericTags = nonEmptyTags.filter(tag => this.isGenericTag(tag))
+      console.log(`🚫 汎用語として除外されたタグ: ${genericTags.join(', ')}`)
+    }
+    
+    return finalTags
   }
   
   private isGenericTag(tag: string): boolean {
