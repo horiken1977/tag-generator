@@ -23,14 +23,12 @@ export class AIClient {
 
   // Stage1A: 軽量キーワード抽出（1行ずつ）
   async extractKeywordsLight(content: string, engine: string = 'openai'): Promise<string[]> {
-    const prompt = this.buildLightPrompt(content)
-    
     if (engine === 'openai') {
-      return await this.callOpenAI(prompt)
+      return await this.callOpenAI(content, 'light')
     } else if (engine === 'claude') {
-      return await this.callClaude(prompt)
+      return await this.callClaude(content, 'light')
     } else if (engine === 'gemini') {
-      return await this.callGemini(prompt)
+      return await this.callGemini(content, 'light')
     }
     
     throw new Error(`Unsupported AI engine: ${engine}`)
@@ -38,26 +36,33 @@ export class AIClient {
 
   // Stage1B: 全体最適化
   async optimizeTags(keywords: string[], engine: string = 'openai'): Promise<string[]> {
-    const prompt = this.buildOptimizePrompt(keywords)
+    const keywordString = keywords.join(', ')
     
     if (engine === 'openai') {
-      return await this.callOpenAI(prompt)
+      return await this.callOpenAI(keywordString, 'optimize')
     } else if (engine === 'claude') {
-      return await this.callClaude(prompt)
+      return await this.callClaude(keywordString, 'optimize')
     } else if (engine === 'gemini') {
-      return await this.callGemini(prompt)
+      return await this.callGemini(keywordString, 'optimize')
     }
     
     throw new Error(`Unsupported AI engine: ${engine}`)
   }
   
-  private async callOpenAI(content: string): Promise<string[]> {
+  private async callOpenAI(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       throw new Error('OpenAI API key not configured')
     }
     
-    const prompt = this.buildPrompt(content)
+    let prompt: string
+    if (promptType === 'light') {
+      prompt = this.buildLightPrompt(content)
+    } else if (promptType === 'optimize') {
+      prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else {
+      prompt = this.buildPrompt(content)
+    }
     console.log(`🤖 OpenAI API呼び出し開始 - プロンプト長: ${prompt.length}文字, コンテンツ長: ${content.length}文字`)
     
     const startTime = Date.now()
@@ -96,13 +101,20 @@ export class AIClient {
     return this.parseTagsFromResponse(result)
   }
   
-  private async callClaude(content: string): Promise<string[]> {
+  private async callClaude(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
     const apiKey = process.env.CLAUDE_API_KEY
     if (!apiKey) {
       throw new Error('Claude API key not configured')
     }
     
-    const prompt = this.buildPrompt(content)
+    let prompt: string
+    if (promptType === 'light') {
+      prompt = this.buildLightPrompt(content)
+    } else if (promptType === 'optimize') {
+      prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else {
+      prompt = this.buildPrompt(content)
+    }
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -133,13 +145,20 @@ export class AIClient {
     return this.parseTagsFromResponse(result)
   }
   
-  private async callGemini(content: string): Promise<string[]> {
+  private async callGemini(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('Gemini API key not configured')
     }
     
-    const prompt = this.buildPrompt(content)
+    let prompt: string
+    if (promptType === 'light') {
+      prompt = this.buildLightPrompt(content)
+    } else if (promptType === 'optimize') {
+      prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else {
+      prompt = this.buildPrompt(content)
+    }
     
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
