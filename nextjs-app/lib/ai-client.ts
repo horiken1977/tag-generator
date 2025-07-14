@@ -87,8 +87,23 @@ export class AIClient {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`❌ OpenAI API HTTP error: ${response.status}, body: ${errorText}`)
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
+      console.error(`❌ OpenAI API HTTP error: ${response.status}`)
+      console.error(`Response headers:`, Object.fromEntries(response.headers.entries()))
+      console.error(`Error body:`, errorText)
+      
+      let errorMessage = `OpenAI API error: ${response.status}`
+      try {
+        const errorData = JSON.parse(errorText)
+        if (errorData.error?.message) {
+          errorMessage += ` - ${errorData.error.message}`
+        } else {
+          errorMessage += ` - ${errorText}`
+        }
+      } catch {
+        errorMessage += ` - ${errorText}`
+      }
+      
+      throw new Error(errorMessage)
     }
     
     const data = await response.json()

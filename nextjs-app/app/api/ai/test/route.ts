@@ -37,13 +37,33 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
       const processingTime = Date.now() - startTime
       
-      console.error(`❌ AI接続テスト失敗: ${aiEngine}, エラー:`, error)
+      console.error(`❌ AI接続テスト失敗: ${aiEngine}`)
+      console.error(`エラー詳細:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        cause: error.cause
+      })
+      
+      // OpenAI APIキーの存在確認
+      const hasOpenAI = !!process.env.OPENAI_API_KEY
+      const hasClaude = !!process.env.CLAUDE_API_KEY  
+      const hasGemini = !!process.env.GEMINI_API_KEY
+      
+      console.log(`🔑 API keys status: OpenAI=${hasOpenAI}, Claude=${hasClaude}, Gemini=${hasGemini}`)
       
       return NextResponse.json({
         success: false,
         engine: aiEngine,
         processing_time: processingTime,
         error: error.message,
+        error_details: {
+          name: error.name,
+          message: error.message,
+          has_openai_key: hasOpenAI,
+          has_claude_key: hasClaude,
+          has_gemini_key: hasGemini
+        },
         message: `${aiEngine}との接続に失敗しました: ${error.message}`
       }, { status: 400 })
     }
