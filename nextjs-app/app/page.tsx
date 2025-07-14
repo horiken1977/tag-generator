@@ -45,7 +45,12 @@ export default function Home() {
   const [stage2Results, setStage2Results] = useState<Stage2Result | null>(null)
   const [approvedCandidates, setApprovedCandidates] = useState<string[]>([])
   const [sheetsUrl, setSheetsUrl] = useState('')
-  const [aiEngine, setAiEngine] = useState('openai')
+  const [aiEngine, setAiEngine] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('preferred_ai_engine') || 'openai'
+    }
+    return 'openai'
+  })
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState({ message: '', type: 'info' })
   const [currentStage, setCurrentStage] = useState(0)
@@ -62,7 +67,10 @@ export default function Home() {
     try {
       const response = await axios.get('/api/status')
       setSystemStatus(response.data)
-      setAiEngine(response.data.default_engine || 'openai')
+      // localStorageに保存された設定がない場合のみdefault_engineを使用
+      if (typeof window !== 'undefined' && !localStorage.getItem('preferred_ai_engine')) {
+        setAiEngine(response.data.default_engine || 'openai')
+      }
     } catch (error) {
       console.error('Status check failed:', error)
     }
@@ -246,7 +254,8 @@ export default function Home() {
         const response = await apiCallWithRetry('/api/ai/stage1', {
           mode: 'extract',
           video_data: videoData,
-          row_index: rowIndex + 1
+          row_index: rowIndex + 1,
+          ai_engine: aiEngine
         })
         
         const result = response.data
@@ -306,7 +315,8 @@ export default function Home() {
       const optimizeResponse = await apiCallWithRetry('/api/ai/stage1', {
         mode: 'optimize',
         all_keywords: allKeywords,
-        total_rows: totalRows
+        total_rows: totalRows,
+        ai_engine: aiEngine
       }, 3, 150000) // 最適化は時間がかかる可能性があるので150秒タイムアウト（85-116秒の処理時間に対応）
 
       const optimizeResult = optimizeResponse.data
@@ -565,7 +575,10 @@ export default function Home() {
             <div className="flex gap-2">
               <select
                 value={aiEngine}
-                onChange={(e) => setAiEngine(e.target.value)}
+                onChange={(e) => {
+                  setAiEngine(e.target.value)
+                  localStorage.setItem('preferred_ai_engine', e.target.value)
+                }}
                 className="flex-1 p-3 rounded-lg bg-white/90 text-gray-800"
               >
                 {systemStatus?.available_engines?.includes('openai') && (

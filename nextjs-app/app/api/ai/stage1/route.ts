@@ -36,7 +36,7 @@ function collectBatchTexts(processData: VideoData[]): string {
 }
 
 // Stage1A: 個別キーワード抽出（1行ずつ軽量処理）
-async function extractKeywordsFromSingleRow(videoData: VideoData): Promise<string[]> {
+async function extractKeywordsFromSingleRow(videoData: VideoData, preferredEngine?: string): Promise<string[]> {
   // 1行分のテキストを構築（文字起こし除外）
   const rowText = [
     videoData.title || '',
@@ -58,10 +58,58 @@ async function extractKeywordsFromSingleRow(videoData: VideoData): Promise<strin
 
   const startTime = Date.now()
   const aiClient = new AIClient()
-  const aiEngine = hasOpenAI ? 'openai' : hasClaude ? 'claude' : 'gemini'
   
-  // 軽量なキーワード抽出
-  const keywords = await aiClient.extractKeywordsLight(rowText, aiEngine)
+  // ユーザー指定エンジンを優先し、フォールバック用の他のエンジンも準備
+  let engines: string[] = []
+  
+  if (preferredEngine && ((preferredEngine === 'openai' && hasOpenAI) || 
+                          (preferredEngine === 'claude' && hasClaude) || 
+                          (preferredEngine === 'gemini' && hasGemini))) {
+    engines.push(preferredEngine)
+    // フォールバック用に他のエンジンも追加（優先度順）
+    if (preferredEngine !== 'claude' && hasClaude) engines.push('claude')
+    if (preferredEngine !== 'gemini' && hasGemini) engines.push('gemini') 
+    if (preferredEngine !== 'openai' && hasOpenAI) engines.push('openai')
+  } else {
+    // 従来の優先順位: Claude > Gemini > OpenAI
+    engines = [
+      ...(hasClaude ? ['claude'] : []),
+      ...(hasGemini ? ['gemini'] : []),
+      ...(hasOpenAI ? ['openai'] : [])
+    ]
+  }
+  
+  let keywords: string[] = []
+  let lastError: any = null
+  
+  // フォールバック機能付きでAI呼び出し
+  for (const engine of engines) {
+    try {
+      console.log(`🔄 ${engine}でキーワード抽出を試行中...${engine === preferredEngine ? ' (ユーザー選択)' : ' (フォールバック)'}`)
+      keywords = await aiClient.extractKeywordsLight(rowText, engine)
+      console.log(`✅ ${engine}で成功: ${keywords.length}個のキーワード`)
+      break
+    } catch (error: any) {
+      lastError = error
+      console.log(`❌ ${engine}で失敗: ${error.message}`)
+      
+      // OpenAIのクォータエラーは予想されるので詳細ログを出力しない
+      if (engine === 'openai' && error.message.includes('quota')) {
+        console.log(`⚠️  OpenAI quota exceeded, falling back to other engines`)
+      }
+      
+      // 最後のエンジンでなければ続行
+      if (engine !== engines[engines.length - 1]) {
+        console.log(`🔄 次のエンジンにフォールバック...`)
+        continue
+      }
+    }
+  }
+  
+  // 全エンジンが失敗した場合
+  if (keywords.length === 0) {
+    throw new Error(`全てのAIエンジンで失敗しました。最後のエラー: ${lastError?.message || 'Unknown error'}`)
+  }
   
   const processingTime = Date.now() - startTime
   console.log(`✅ 1行分析完了: ${keywords.length}個のキーワード, 処理時間: ${processingTime}ms`)
@@ -70,7 +118,7 @@ async function extractKeywordsFromSingleRow(videoData: VideoData): Promise<strin
 }
 
 // Stage1B: 全体最適化（収集したキーワードから200個のタグ生成）
-async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
+async function optimizeGlobalTags(allKeywords: string[], preferredEngine?: string): Promise<string[]> {
   const functionStartTime = Date.now()
   const functionId = Math.random().toString(36).substr(2, 6)
   console.log(`🌐 [${functionId}] 全体最適化開始: ${allKeywords.length}個のキーワードから200個のタグを生成`)
@@ -85,7 +133,26 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
   }
 
   const aiClient = new AIClient()
-  const aiEngine = hasOpenAI ? 'openai' : hasClaude ? 'claude' : 'gemini'
+  
+  // ユーザー指定エンジンを優先し、フォールバック用の他のエンジンも準備
+  let engines: string[] = []
+  
+  if (preferredEngine && ((preferredEngine === 'openai' && hasOpenAI) || 
+                          (preferredEngine === 'claude' && hasClaude) || 
+                          (preferredEngine === 'gemini' && hasGemini))) {
+    engines.push(preferredEngine)
+    // フォールバック用に他のエンジンも追加（優先度順）
+    if (preferredEngine !== 'claude' && hasClaude) engines.push('claude')
+    if (preferredEngine !== 'gemini' && hasGemini) engines.push('gemini') 
+    if (preferredEngine !== 'openai' && hasOpenAI) engines.push('openai')
+  } else {
+    // 従来の優先順位: Claude > Gemini > OpenAI
+    engines = [
+      ...(hasClaude ? ['claude'] : []),
+      ...(hasGemini ? ['gemini'] : []),
+      ...(hasOpenAI ? ['openai'] : [])
+    ]
+  }
   
   // 大量キーワードの場合は多段階で処理
   if (allKeywords.length > 5000) {
@@ -130,7 +197,28 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
         const batchStartTime = Date.now()
         console.log(`   [${functionId}] バッチ ${i + 1}/${batches.length} 開始... (${batches[i].length}個) - ${new Date().toISOString()}`)
         
-        const batchResults = await aiClient.optimizeTags(batches[i], aiEngine)
+        // フォールバック機能付きでバッチ処理
+        let batchResults: string[] = []
+        let batchError: any = null
+        
+        for (const engine of engines) {
+          try {
+            console.log(`   🔄 [${functionId}] バッチ ${i + 1} - ${engine}で試行中...${engine === preferredEngine ? ' (ユーザー選択)' : ' (フォールバック)'}`)
+            batchResults = await aiClient.optimizeTags(batches[i], engine)
+            console.log(`   ✅ [${functionId}] バッチ ${i + 1} - ${engine}で成功`)
+            break
+          } catch (error: any) {
+            batchError = error
+            console.log(`   ❌ [${functionId}] バッチ ${i + 1} - ${engine}で失敗: ${error.message}`)
+            if (engine !== engines[engines.length - 1]) {
+              continue
+            }
+          }
+        }
+        
+        if (batchResults.length === 0) {
+          throw batchError || new Error('All AI engines failed for batch processing')
+        }
         const batchTime = Date.now() - batchStartTime
         
         intermediateResults.push(...batchResults.slice(0, 50)) // 各バッチから最大50個に制限（バッチ数減少のため増加）
@@ -157,7 +245,30 @@ async function optimizeGlobalTags(allKeywords: string[]): Promise<string[]> {
     
     console.log(`🎯 Step 3: 最終最適化 → 200個のタグへ (入力: ${intermediateResults.length}個)`)
     const startTime = Date.now()
-    const finalTags = await aiClient.optimizeTags(intermediateResults, aiEngine)
+    
+    // フォールバック機能付きで最終最適化
+    let finalTags: string[] = []
+    let finalError: any = null
+    
+    for (const engine of engines) {
+      try {
+        console.log(`🔄 Step 3 - ${engine}で最終最適化を試行中...${engine === preferredEngine ? ' (ユーザー選択)' : ' (フォールバック)'}`)
+        finalTags = await aiClient.optimizeTags(intermediateResults, engine)
+        console.log(`✅ Step 3 - ${engine}で成功`)
+        break
+      } catch (error: any) {
+        finalError = error
+        console.log(`❌ Step 3 - ${engine}で失敗: ${error.message}`)
+        if (engine !== engines[engines.length - 1]) {
+          continue
+        }
+      }
+    }
+    
+    if (finalTags.length === 0) {
+      throw finalError || new Error('All AI engines failed for final optimization')
+    }
+    
     const processingTime = Date.now() - startTime
     
     console.log(`✅ 多段階最適化完了: ${finalTags.length}個のタグ, 最終処理時間: ${processingTime}ms`)
@@ -184,6 +295,7 @@ export async function POST(request: NextRequest) {
     const bodyParseTime = Date.now() - bodyParseStart
     console.log(`📄 [${requestId}] リクエストボディ解析完了: ${bodyParseTime}ms`)
     const mode = body.mode // 'extract' または 'optimize'
+    const aiEngine = body.ai_engine || 'openai' // フロントエンドから送信されたエンジン選択
     
     if (mode === 'extract') {
       // Stage1A: 個別キーワード抽出
@@ -200,7 +312,7 @@ export async function POST(request: NextRequest) {
       }
       
       const startTime = Date.now()
-      const keywords = await extractKeywordsFromSingleRow(videoData)
+      const keywords = await extractKeywordsFromSingleRow(videoData, aiEngine)
       const processingTime = Date.now() - startTime
       
       return NextResponse.json({
@@ -266,7 +378,7 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`🎯 [${requestId}] optimizeGlobalTags呼び出し開始: ${allKeywords.length}個`)
         const optimizeStart = Date.now()
-        optimizedTags = await optimizeGlobalTags(allKeywords)
+        optimizedTags = await optimizeGlobalTags(allKeywords, aiEngine)
         const optimizeTime = Date.now() - optimizeStart
         console.log(`✅ [${requestId}] optimizeGlobalTags完了: ${optimizeTime}ms`)
       } catch (optimizeError: any) {
