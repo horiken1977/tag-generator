@@ -48,8 +48,23 @@ export class AIClient {
     
     throw new Error(`Unsupported AI engine: ${engine}`)
   }
+
+  // Stage2: 個別動画タグ選択（文字起こし含む5列分析）
+  async selectTagsForVideo(videoContent: string, tagCandidates: string[], engine: string = 'openai'): Promise<string[]> {
+    const candidatesString = tagCandidates.join(', ')
+    
+    if (engine === 'openai') {
+      return await this.callOpenAI(`${videoContent}|||${candidatesString}`, 'select')
+    } else if (engine === 'claude') {
+      return await this.callClaude(`${videoContent}|||${candidatesString}`, 'select')
+    } else if (engine === 'gemini') {
+      return await this.callGemini(`${videoContent}|||${candidatesString}`, 'select')
+    }
+    
+    throw new Error(`Unsupported AI engine: ${engine}`)
+  }
   
-  private async callOpenAI(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
+  private async callOpenAI(content: string, promptType: 'standard' | 'light' | 'optimize' | 'select' = 'standard'): Promise<string[]> {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       throw new Error('OpenAI API key not configured')
@@ -60,6 +75,9 @@ export class AIClient {
       prompt = this.buildLightPrompt(content)
     } else if (promptType === 'optimize') {
       prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else if (promptType === 'select') {
+      const [videoContent, candidates] = content.split('|||')
+      prompt = this.buildSelectPrompt(videoContent, candidates.split(',').map(c => c.trim()))
     } else {
       prompt = this.buildPrompt(content)
     }
@@ -116,7 +134,7 @@ export class AIClient {
     return this.parseTagsFromResponse(result)
   }
   
-  private async callClaude(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
+  private async callClaude(content: string, promptType: 'standard' | 'light' | 'optimize' | 'select' = 'standard'): Promise<string[]> {
     const apiKey = process.env.CLAUDE_API_KEY
     if (!apiKey) {
       throw new Error('Claude API key not configured')
@@ -127,6 +145,9 @@ export class AIClient {
       prompt = this.buildLightPrompt(content)
     } else if (promptType === 'optimize') {
       prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else if (promptType === 'select') {
+      const [videoContent, candidates] = content.split('|||')
+      prompt = this.buildSelectPrompt(videoContent, candidates.split(',').map(c => c.trim()))
     } else {
       prompt = this.buildPrompt(content)
     }
@@ -172,7 +193,7 @@ export class AIClient {
     return tags
   }
   
-  private async callGemini(content: string, promptType: 'standard' | 'light' | 'optimize' = 'standard'): Promise<string[]> {
+  private async callGemini(content: string, promptType: 'standard' | 'light' | 'optimize' | 'select' = 'standard'): Promise<string[]> {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('Gemini API key not configured')
@@ -183,6 +204,9 @@ export class AIClient {
       prompt = this.buildLightPrompt(content)
     } else if (promptType === 'optimize') {
       prompt = this.buildOptimizePrompt(content.split(',').map(k => k.trim()))
+    } else if (promptType === 'select') {
+      const [videoContent, candidates] = content.split('|||')
+      prompt = this.buildSelectPrompt(videoContent, candidates.split(',').map(c => c.trim()))
     } else {
       prompt = this.buildPrompt(content)
     }
@@ -323,6 +347,37 @@ ${keywordText}
 - カンマ区切りで出力
 
 出力: 最適化された200個のタグをカンマ区切りで出力してください。
+`
+  }
+
+  // Stage2: 個別動画タグ選択用プロンプト
+  private buildSelectPrompt(videoContent: string, tagCandidates: string[]): string {
+    return `
+以下のマーケティング動画の全データ（タイトル、スキル、説明、要約、文字起こし）を詳細に分析し、提供されたタグ候補から最も関連性の高い10-15個のタグを選択してください。
+
+【動画データ】:
+${videoContent}
+
+【タグ候補（${tagCandidates.length}個）】:
+${tagCandidates.join(', ')}
+
+【タグ選択基準】:
+1. 動画の核心的な内容・テーマとの関連性
+2. 文字起こしに含まれる具体的な話題・手法
+3. スキルレベルや対象者との適合性
+4. 検索において発見されやすさ
+5. 学習者にとっての有用性
+
+【重要な指示】:
+- 必ず提供されたタグ候補の中からのみ選択してください
+- 文字起こしの内容を重視して詳細に分析してください
+- 10-15個の範囲で選択してください（最低10個、最大15個）
+- 動画の主要テーマから関連テーマまで幅広くカバーしてください
+
+【出力形式】:
+選択したタグのみをカンマ区切りで出力してください。説明や理由は不要です。
+
+出力: (選択されたタグをカンマ区切りで)
 `
   }
   
