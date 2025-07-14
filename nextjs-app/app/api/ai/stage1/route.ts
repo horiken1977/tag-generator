@@ -275,9 +275,30 @@ async function optimizeGlobalTags(allKeywords: string[], preferredEngine?: strin
     return finalTags
     
   } else {
-    // 通常の処理
+    // 通常の処理（フォールバック機能付き）
     const startTime = Date.now()
-    const optimizedTags = await aiClient.optimizeTags(allKeywords, aiEngine)
+    let optimizedTags: string[] = []
+    let lastError: any = null
+    
+    for (const engine of engines) {
+      try {
+        console.log(`🔄 通常処理 - ${engine}で最適化を試行中...${engine === preferredEngine ? ' (ユーザー選択)' : ' (フォールバック)'}`)
+        optimizedTags = await aiClient.optimizeTags(allKeywords, engine)
+        console.log(`✅ 通常処理 - ${engine}で成功`)
+        break
+      } catch (error: any) {
+        lastError = error
+        console.log(`❌ 通常処理 - ${engine}で失敗: ${error.message}`)
+        if (engine !== engines[engines.length - 1]) {
+          continue
+        }
+      }
+    }
+    
+    if (optimizedTags.length === 0) {
+      throw lastError || new Error('All AI engines failed for standard optimization')
+    }
+    
     const processingTime = Date.now() - startTime
     console.log(`✅ 全体最適化完了: ${optimizedTags.length}個のタグ, 処理時間: ${processingTime}ms`)
     return optimizedTags
