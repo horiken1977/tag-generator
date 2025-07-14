@@ -270,7 +270,17 @@ ${content}
 - 助詞・接続詞・一般的すぎる語（「する」「ある」「方法」「技術」等の単体使用）
 - 「6つの」「8つの」等の数量表現のみ
 
-出力: 検索に有用で具体的なキーワードを20-30個、カンマ区切りで出力してください。多様性を重視し、幅広い観点から抽出してください。
+【重要な出力形式】:
+検索に有用で具体的なキーワードを20-30個、必ずカンマ区切りで1行に出力してください。
+例: キーワード1, キーワード2, キーワード3, キーワード4, ...
+
+【禁止事項】:
+- 改行での区切り
+- 番号付きリスト
+- 説明文の追加
+- 「以下のキーワードを抽出しました」等の前置き
+
+出力: (キーワードのみをカンマ区切りで)
 `
   }
 
@@ -317,8 +327,27 @@ ${keywordText}
   }
   
   private parseTagsFromResponse(response: string): string[] {
-    // Extract tags from AI response - expecting 150-200 tags
-    const splitTags = response.split(/[,\n]/)
+    console.log(`🔍 原文応答（最初の500文字）: "${response.substring(0, 500)}"`)
+    
+    // より柔軟な分割パターンを試行
+    let splitTags: string[] = []
+    
+    // パターン1: カンマ区切り
+    if (response.includes(',')) {
+      splitTags = response.split(/[,，]/)
+      console.log(`📝 カンマ区切りで分割: ${splitTags.length}個`)
+    }
+    // パターン2: 改行区切り
+    else if (response.includes('\n')) {
+      splitTags = response.split(/\r?\n/)
+      console.log(`📝 改行区切りで分割: ${splitTags.length}個`)
+    }
+    // パターン3: スペース区切り（最後の手段）
+    else {
+      splitTags = response.split(/\s+/)
+      console.log(`📝 スペース区切りで分割: ${splitTags.length}個`)
+    }
+    
     const trimmedTags = splitTags.map(tag => tag.trim())
     const nonEmptyTags = trimmedTags.filter(tag => tag.length > 0)
     const filteredTags = nonEmptyTags.filter(tag => !this.isGenericTag(tag))
@@ -326,10 +355,13 @@ ${keywordText}
     
     console.log(`🏷️ タグ解析詳細: 分割=${splitTags.length}, 空除去=${nonEmptyTags.length}, 汎用語除去=${filteredTags.length}, 最終=${finalTags.length}`)
     
+    // デバッグ：最初の10個のタグを表示
+    console.log(`📋 最初の10個のタグ: ${finalTags.slice(0, 10).join(', ')}`)
+    
     // デバッグ：汎用語としてフィルタされたタグを表示
     if (nonEmptyTags.length > filteredTags.length) {
       const genericTags = nonEmptyTags.filter(tag => this.isGenericTag(tag))
-      console.log(`🚫 汎用語として除外されたタグ: ${genericTags.join(', ')}`)
+      console.log(`🚫 汎用語として除外されたタグ: ${genericTags.slice(0, 10).join(', ')}${genericTags.length > 10 ? ` (他${genericTags.length - 10}個)` : ''}`)
     }
     
     return finalTags
