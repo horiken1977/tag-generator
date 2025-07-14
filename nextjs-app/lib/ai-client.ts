@@ -131,7 +131,10 @@ export class AIClient {
     console.log(`✅ OpenAI API応答完了 - 処理時間: ${processingTime}ms, レスポンス長: ${result.length}文字`)
     console.log(`📝 OpenAI生成内容プレビュー: "${result.substring(0, 200)}..."`)
     
-    return this.parseTagsFromResponse(result)
+    // Stage2の場合は専用の解析を使用
+    return promptType === 'select' 
+      ? this.parseSelectedTagsFromResponse(result)
+      : this.parseTagsFromResponse(result)
   }
   
   private async callClaude(content: string, promptType: 'standard' | 'light' | 'optimize' | 'select' = 'standard'): Promise<string[]> {
@@ -183,7 +186,10 @@ export class AIClient {
     
     console.log(`🤖 Claude API応答 (${promptType}): "${result}"`)
     
-    const tags = this.parseTagsFromResponse(result)
+    // Stage2の場合は専用の解析を使用
+    const tags = promptType === 'select' 
+      ? this.parseSelectedTagsFromResponse(result)
+      : this.parseTagsFromResponse(result)
     
     // デバッグ用：parseTagsFromResponseの前後を確認
     if (tags.length === 0 && result.length > 0) {
@@ -240,7 +246,10 @@ export class AIClient {
     const data = await response.json()
     const result = data.candidates[0]?.content?.parts[0]?.text || ''
     
-    return this.parseTagsFromResponse(result)
+    // Stage2の場合は専用の解析を使用
+    return promptType === 'select' 
+      ? this.parseSelectedTagsFromResponse(result)
+      : this.parseTagsFromResponse(result)
   }
   
   private buildPrompt(content: string): string {
@@ -375,9 +384,16 @@ ${tagCandidates.join(', ')}
 - 動画の主要テーマから関連テーマまで幅広くカバーしてください
 
 【出力形式】:
-選択したタグのみをカンマ区切りで出力してください。説明や理由は不要です。
+選択したタグのみを必ずカンマ区切りで1行に出力してください。
+例: タグ1, タグ2, タグ3, タグ4, タグ5
 
-出力: (選択されたタグをカンマ区切りで)
+【厳守事項】:
+- 改行、番号付きリスト、箇条書きは禁止
+- 説明文、前置き、理由は一切不要
+- タグ名のみをカンマとスペースで区切る
+- 「以下のタグを選択しました」等の文言は不要
+
+出力: 
 `
   }
   
@@ -418,6 +434,60 @@ ${tagCandidates.join(', ')}
       const genericTags = nonEmptyTags.filter(tag => this.isGenericTag(tag))
       console.log(`🚫 汎用語として除外されたタグ: ${genericTags.slice(0, 10).join(', ')}${genericTags.length > 10 ? ` (他${genericTags.length - 10}個)` : ''}`)
     }
+    
+    return finalTags
+  }
+
+  // Stage2専用: 選択されたタグの解析（より厳密な処理）
+  private parseSelectedTagsFromResponse(response: string): string[] {
+    console.log(`🔍 Stage2応答（全文）: "${response}"`)
+    
+    // 不要な前置きや説明文を除去
+    let cleanResponse = response
+      .replace(/^(以下|選択した|抽出した|おすすめの|関連する).*?[：:]/g, '')
+      .replace(/^.*?(タグ|キーワード).*?[：:]/g, '')
+      .replace(/^.*?結果.*?[：:]/g, '')
+      .trim()
+    
+    console.log(`🧹 クリーンアップ後: "${cleanResponse}"`)
+    
+    // より柔軟な分割パターンを試行（Stage2専用）
+    let splitTags: string[] = []
+    
+    // パターン1: カンマ区切り（最優先）
+    if (cleanResponse.includes(',')) {
+      splitTags = cleanResponse.split(/[,，、]/)
+      console.log(`📝 カンマ区切りで分割: ${splitTags.length}個`)
+    }
+    // パターン2: 改行区切り
+    else if (cleanResponse.includes('\n')) {
+      splitTags = cleanResponse.split(/\r?\n/)
+      console.log(`📝 改行区切りで分割: ${splitTags.length}個`)
+    }
+    // パターン3: 番号付きリスト（1. 2. 3.）
+    else if (/\d+\./.test(cleanResponse)) {
+      splitTags = cleanResponse.split(/\d+\./).filter(tag => tag.trim().length > 0)
+      console.log(`📝 番号付きリストで分割: ${splitTags.length}個`)
+    }
+    // パターン4: 箇条書き（- * •）
+    else if (/[-\*•]/.test(cleanResponse)) {
+      splitTags = cleanResponse.split(/[-\*•]/).filter(tag => tag.trim().length > 0)
+      console.log(`📝 箇条書きで分割: ${splitTags.length}個`)
+    }
+    // パターン5: スペース区切り（最後の手段）
+    else {
+      splitTags = cleanResponse.split(/\s+/)
+      console.log(`📝 スペース区切りで分割: ${splitTags.length}個`)
+    }
+    
+    const trimmedTags = splitTags.map(tag => tag.trim())
+    const nonEmptyTags = trimmedTags.filter(tag => tag.length > 0)
+    // Stage2では汎用語フィルタを緩くする（既に選択されたタグなので）
+    const filteredTags = nonEmptyTags.filter(tag => tag.length > 1 && !tag.match(/^[。、.,\s]*$/))
+    const finalTags = filteredTags.slice(0, 15) // Stage2は最大15個
+    
+    console.log(`🏷️ Stage2タグ解析: 分割=${splitTags.length}, 空除去=${nonEmptyTags.length}, フィルタ後=${filteredTags.length}, 最終=${finalTags.length}`)
+    console.log(`📋 選択されたタグ: ${finalTags.join(', ')}`)
     
     return finalTags
   }
