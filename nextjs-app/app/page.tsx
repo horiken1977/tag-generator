@@ -331,8 +331,8 @@ export default function Home() {
           // 文字列の場合はカンマ区切りで分割
           processedResult.tag_candidates = optimizeResult.tag_candidates
             .split(/[,，、]/)
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0)
+            .map((tag: string) => tag.trim())
+            .filter((tag: string) => tag.length > 0)
           console.log('🔧 文字列から配列に変換:', processedResult.tag_candidates.length, '個')
         } else if (!Array.isArray(optimizeResult.tag_candidates)) {
           console.warn('⚠️ タグ候補が配列でも文字列でもありません:', optimizeResult.tag_candidates)
