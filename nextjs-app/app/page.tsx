@@ -321,7 +321,26 @@ export default function Home() {
 
       const optimizeResult = optimizeResponse.data
       if (optimizeResult.success) {
-        setStage1Results(optimizeResult)
+        console.log('🔍 Stage1レスポンス:', optimizeResult)
+        console.log('🏷️ タグ候補の型:', typeof optimizeResult.tag_candidates)
+        console.log('🏷️ タグ候補:', optimizeResult.tag_candidates)
+        
+        // タグ候補が配列でない場合は配列に変換
+        let processedResult = { ...optimizeResult }
+        if (typeof optimizeResult.tag_candidates === 'string') {
+          // 文字列の場合はカンマ区切りで分割
+          processedResult.tag_candidates = optimizeResult.tag_candidates
+            .split(/[,，、]/)
+            .map(tag => tag.trim())
+            .filter(tag => tag.length > 0)
+          console.log('🔧 文字列から配列に変換:', processedResult.tag_candidates.length, '個')
+        } else if (!Array.isArray(optimizeResult.tag_candidates)) {
+          console.warn('⚠️ タグ候補が配列でも文字列でもありません:', optimizeResult.tag_candidates)
+          processedResult.tag_candidates = []
+        }
+        
+        console.log('📋 最終的なタグ候補数:', processedResult.tag_candidates.length)
+        setStage1Results(processedResult)
         setResumeData(null) // 成功時は再開データをクリア
         localStorage.removeItem('stage1_resume_data') // 再開データも削除
         setProgress({ current: 0, total: 0, phase: '', details: '' }) // 進捗リセット
@@ -358,7 +377,17 @@ export default function Home() {
 
   const selectAllCandidates = () => {
     if (stage1Results) {
-      setApprovedCandidates(stage1Results.tag_candidates)
+      let candidates = stage1Results.tag_candidates || []
+      // 文字列の場合は分割
+      if (typeof candidates === 'string') {
+        candidates = candidates
+          .split(/[,，、]/)
+          .map((tag: string) => tag.trim())
+          .filter((tag: string) => tag.length > 0)
+      }
+      if (Array.isArray(candidates)) {
+        setApprovedCandidates(candidates)
+      }
     }
   }
 
@@ -715,20 +744,47 @@ export default function Home() {
                 </button>
               </div>
               <div className="max-h-96 overflow-y-auto bg-white/5 rounded-lg p-4">
-                {stage1Results.tag_candidates.map((candidate, index) => (
-                  <div key={index} className="flex items-center p-2 bg-white/10 rounded-md mb-2">
-                    <input
-                      type="checkbox"
-                      checked={approvedCandidates.includes(candidate)}
-                      onChange={() => toggleCandidate(candidate)}
-                      className="mr-3 w-5 h-5"
-                    />
-                    <span>{candidate}</span>
-                  </div>
-                ))}
+                {(() => {
+                  // タグ候補を配列として確実に取得
+                  let candidates: any = stage1Results.tag_candidates || []
+                  
+                  // 文字列の場合は分割
+                  if (typeof candidates === 'string') {
+                    candidates = candidates
+                      .split(/[,，、]/)
+                      .map((tag: string) => tag.trim())
+                      .filter((tag: string) => tag.length > 0)
+                  }
+                  
+                  // 配列でない場合は空配列
+                  if (!Array.isArray(candidates)) {
+                    console.warn('⚠️ タグ候補が配列形式ではありません:', candidates)
+                    candidates = []
+                  }
+                  
+                  console.log('📋 表示用タグ候補:', candidates.length, '個')
+                  
+                  return candidates.map((candidate: string, index: number) => (
+                    <div key={index} className="flex items-center p-2 bg-white/10 rounded-md mb-2">
+                      <input
+                        type="checkbox"
+                        checked={approvedCandidates.includes(candidate)}
+                        onChange={() => toggleCandidate(candidate)}
+                        className="mr-3 w-5 h-5"
+                      />
+                      <span>{candidate}</span>
+                    </div>
+                  ))
+                })()}
               </div>
               <div className="mt-4">
-                <span>{approvedCandidates.length} / {stage1Results.tag_candidates.length} 個のタグ候補が選択されています</span>
+                <span>{approvedCandidates.length} / {(() => {
+                  let candidates: any = stage1Results.tag_candidates || []
+                  if (typeof candidates === 'string') {
+                    candidates = candidates.split(/[,，、]/).map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+                  }
+                  return Array.isArray(candidates) ? candidates.length : 0
+                })()} 個のタグ候補が選択されています</span>
               </div>
               <button
                 onClick={approveAndProceed}
