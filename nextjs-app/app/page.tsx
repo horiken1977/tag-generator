@@ -14,7 +14,7 @@ interface VideoData {
 interface Stage1Result {
   stage: number
   success: boolean
-  tag_candidates: string[]
+  tag_candidates: string[] | string
   candidate_count: number
   processing_time: number
   message: string
@@ -377,16 +377,17 @@ export default function Home() {
 
   const selectAllCandidates = () => {
     if (stage1Results) {
-      let candidates: string[] | string = stage1Results.tag_candidates || []
+      let candidates = stage1Results.tag_candidates || []
       // 文字列の場合は分割
       if (typeof candidates === 'string') {
-        candidates = candidates
+        const stringCandidates: string = candidates
+        candidates = stringCandidates
           .split(/[,，、]/)
           .map((tag: string) => tag.trim())
           .filter((tag: string) => tag.length > 0)
       }
       if (Array.isArray(candidates)) {
-        setApprovedCandidates(candidates)
+        setApprovedCandidates(candidates as string[])
       }
     }
   }
@@ -423,7 +424,6 @@ export default function Home() {
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         const batchStart = batchIndex * batchSize
         const batchEnd = Math.min(batchStart + batchSize, currentData.length)
-        const batchVideoCount = batchEnd - batchStart
         
         setProgress({
           current: batchIndex,
@@ -749,11 +749,12 @@ export default function Home() {
               <div className="max-h-96 overflow-y-auto bg-white/5 rounded-lg p-4">
                 {(() => {
                   // タグ候補を配列として確実に取得
-                  let candidates: string[] | string = stage1Results.tag_candidates || []
+                  let candidates = stage1Results.tag_candidates || []
                   
                   // 文字列の場合は分割
                   if (typeof candidates === 'string') {
-                    candidates = candidates
+                    const stringCandidates: string = candidates
+                    candidates = stringCandidates
                       .split(/[,，、]/)
                       .map((tag: string) => tag.trim())
                       .filter((tag: string) => tag.length > 0)
@@ -782,9 +783,10 @@ export default function Home() {
               </div>
               <div className="mt-4">
                 <span>{approvedCandidates.length} / {(() => {
-                  let candidates: string[] | string = stage1Results.tag_candidates || []
+                  let candidates = stage1Results.tag_candidates || []
                   if (typeof candidates === 'string') {
-                    candidates = candidates.split(/[,，、]/).map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+                    const stringCandidates: string = candidates
+                    candidates = stringCandidates.split(/[,，、]/).map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
                   }
                   return Array.isArray(candidates) ? candidates.length : 0
                 })()} 個のタグ候補が選択されています</span>
