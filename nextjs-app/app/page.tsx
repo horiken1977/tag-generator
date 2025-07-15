@@ -377,7 +377,7 @@ export default function Home() {
 
   const selectAllCandidates = () => {
     if (stage1Results) {
-      let candidates = stage1Results.tag_candidates || []
+      let candidates: string[] | string = stage1Results.tag_candidates || []
       // 文字列の場合は分割
       if (typeof candidates === 'string') {
         candidates = candidates
@@ -749,7 +749,7 @@ export default function Home() {
               <div className="max-h-96 overflow-y-auto bg-white/5 rounded-lg p-4">
                 {(() => {
                   // タグ候補を配列として確実に取得
-                  let candidates: any = stage1Results.tag_candidates || []
+                  let candidates: string[] | string = stage1Results.tag_candidates || []
                   
                   // 文字列の場合は分割
                   if (typeof candidates === 'string') {
@@ -782,7 +782,7 @@ export default function Home() {
               </div>
               <div className="mt-4">
                 <span>{approvedCandidates.length} / {(() => {
-                  let candidates: any = stage1Results.tag_candidates || []
+                  let candidates: string[] | string = stage1Results.tag_candidates || []
                   if (typeof candidates === 'string') {
                     candidates = candidates.split(/[,，、]/).map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
                   }
