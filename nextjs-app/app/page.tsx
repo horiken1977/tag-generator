@@ -434,7 +434,7 @@ export default function Home() {
     showStatus('第2段階: 個別動画を分析中...')
 
     try {
-      const batchSize = 20
+      const batchSize = 10 // レート制限対策でバッチサイズを小さく
       const totalBatches = Math.ceil(currentData.length / batchSize)
       const allResults: any[] = []
       let totalProcessingTime = 0
@@ -452,10 +452,10 @@ export default function Home() {
         })
         showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} (動画${batchStart + 1}-${batchEnd}件) をLLM分析中...`)
         
-        // バッチデータの準備（文字起こしを短縮）
+        // バッチデータの準備（文字起こしを短縮してトークン数削減）
         const batchData = currentData.slice(batchStart, batchEnd).map(video => ({
           ...video,
-          transcript: video.transcript ? video.transcript.slice(0, 500) : '' // 最大500文字
+          transcript: video.transcript ? video.transcript.slice(0, 300) : '' // 最大300文字（レート制限対策）
         }))
         
         const response = await axios.post('/api/ai/stage2', {
