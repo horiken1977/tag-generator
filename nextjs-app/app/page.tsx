@@ -325,19 +325,38 @@ export default function Home() {
         console.log('🏷️ タグ候補の型:', typeof optimizeResult.tag_candidates)
         console.log('🏷️ タグ候補:', optimizeResult.tag_candidates)
         
-        // タグ候補が配列でない場合は配列に変換
+        // タグ候補を個別タグに分割処理
         let processedResult = { ...optimizeResult }
+        let allTags: string[] = []
+        
         if (typeof optimizeResult.tag_candidates === 'string') {
           // 文字列の場合はカンマ区切りで分割
-          processedResult.tag_candidates = optimizeResult.tag_candidates
+          allTags = optimizeResult.tag_candidates
             .split(/[,，、]/)
             .map((tag: string) => tag.trim())
             .filter((tag: string) => tag.length > 0)
-          console.log('🔧 文字列から配列に変換:', processedResult.tag_candidates.length, '個')
-        } else if (!Array.isArray(optimizeResult.tag_candidates)) {
+          console.log('🔧 文字列から配列に変換:', allTags.length, '個')
+        } else if (Array.isArray(optimizeResult.tag_candidates)) {
+          // 配列の場合、各要素をカンマ区切りで分割して統合
+          optimizeResult.tag_candidates.forEach((item: string) => {
+            if (typeof item === 'string') {
+              const splitTags = item
+                .split(/[,，、]/)
+                .map((tag: string) => tag.trim())
+                .filter((tag: string) => tag.length > 0)
+              allTags.push(...splitTags)
+            }
+          })
+          console.log('🔧 配列要素を分割して統合:', allTags.length, '個')
+        } else {
           console.warn('⚠️ タグ候補が配列でも文字列でもありません:', optimizeResult.tag_candidates)
-          processedResult.tag_candidates = []
+          allTags = []
         }
+        
+        // 重複削除
+        const uniqueTags = Array.from(new Set(allTags))
+        processedResult.tag_candidates = uniqueTags
+        console.log('🔧 重複削除後:', uniqueTags.length, '個')
         
         console.log('📋 最終的なタグ候補数:', processedResult.tag_candidates.length)
         setStage1Results(processedResult)
