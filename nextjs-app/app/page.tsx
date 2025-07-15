@@ -517,7 +517,10 @@ export default function Home() {
       ...data.map(row => [row.title, row.tags, row.tag_count, row.confidence])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    // UTF-8 BOM付きでCSVファイルを作成（Excelで正しく表示されるように）
+    const BOM = '\uFEFF'
+    const csvWithBOM = BOM + csv
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `tag_results_${new Date().toISOString().slice(0, 10)}.csv`
