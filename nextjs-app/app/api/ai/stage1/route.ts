@@ -226,8 +226,8 @@ async function optimizeGlobalTags(allKeywords: string[], preferredEngine?: strin
         }
         const batchTime = Date.now() - batchStartTime
         
-        intermediateResults.push(...batchResults.slice(0, 50)) // 各バッチから最大50個に制限（バッチ数減少のため増加）
-        console.log(`   ✅ [${functionId}] バッチ ${i + 1} 完了: ${batchResults.length}個→${Math.min(batchResults.length, 50)}個選択, ${batchTime}ms`)
+        intermediateResults.push(...batchResults.slice(0, 150)) // 各バッチから最大150個に制限（200個以上の出力を確保）
+        console.log(`   ✅ [${functionId}] バッチ ${i + 1} 完了: ${batchResults.length}個→${Math.min(batchResults.length, 150)}個選択, ${batchTime}ms`)
         
         // バッチ間に短い待機時間を追加（API制限対策）
         if (i < batches.length - 1) {
