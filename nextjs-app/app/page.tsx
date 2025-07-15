@@ -392,11 +392,19 @@ export default function Home() {
 
       // バッチごとに処理
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-        showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} を処理中...`)
-        
-        // バッチデータの準備（文字起こしを短縮）
         const batchStart = batchIndex * batchSize
         const batchEnd = Math.min(batchStart + batchSize, currentData.length)
+        const batchVideoCount = batchEnd - batchStart
+        
+        setProgress({
+          current: batchIndex,
+          total: totalBatches,
+          phase: 'Stage2: 個別動画タグ付け',
+          details: `バッチ ${batchIndex + 1}/${totalBatches} - 動画 ${batchStart + 1}-${batchEnd}/${currentData.length}件をLLM分析中...`
+        })
+        showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} (動画${batchStart + 1}-${batchEnd}件) をLLM分析中...`)
+        
+        // バッチデータの準備（文字起こしを短縮）
         const batchData = currentData.slice(batchStart, batchEnd).map(video => ({
           ...video,
           transcript: video.transcript ? video.transcript.slice(0, 500) : '' // 最大500文字
@@ -409,13 +417,26 @@ export default function Home() {
           batch_index: 0, // バッチデータは既に切り出し済み
           batch_size: batchData.length
         }, {
-          timeout: 30000
+          timeout: 300000 // Stage2は各動画をLLM分析するため5分に延長
         })
         
         const batchResult = response.data
         if (batchResult.success) {
           allResults.push(...batchResult.results)
           totalProcessingTime += batchResult.statistics.processing_time
+          
+          // バッチ完了後の進捗表示
+          const completedVideos = allResults.length
+          const successCount = batchResult.results.filter((r: any) => r.success).length
+          const errorCount = batchResult.results.filter((r: any) => !r.success).length
+          
+          console.log(`✅ バッチ ${batchIndex + 1} 完了: 成功${successCount}件, エラー${errorCount}件`)
+          showStatus(`✅ バッチ ${batchIndex + 1}/${totalBatches} 完了 (処理済み: ${completedVideos}/${currentData.length}件)`)
+          
+          // バッチ間に少し間隔を設ける（レート制限対策）
+          if (batchIndex < totalBatches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000)) // 2秒待機
+          }
         } else {
           showStatus(`❌ バッチ${batchIndex + 1}でエラー: ${batchResult.error}`, 'danger')
           setLoading(false)

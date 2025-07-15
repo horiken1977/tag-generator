@@ -168,7 +168,9 @@ export async function POST(request: NextRequest) {
       
       // レート制限回避のため動画間に少し間隔を設ける
       if (i < batchData.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000)) // 1秒待機
+        // Geminiの429エラーが多発している場合は間隔を長くする
+        const waitTime = aiEngine === 'gemini' ? 3000 : 1000 // Geminiの場合は3秒、その他は1秒
+        await new Promise(resolve => setTimeout(resolve, waitTime))
       }
     }
 
