@@ -458,15 +458,59 @@ export default function Home() {
           transcript: video.transcript ? video.transcript.slice(0, 300) : '' // 最大300文字（レート制限対策）
         }))
         
-        const response = await axios.post('/api/ai/stage2', {
-          data: batchData,
-          approved_candidates: approvedCandidates,
-          ai_engine: aiEngine,
-          batch_index: 0, // バッチデータは既に切り出し済み
-          batch_size: batchData.length
-        }, {
-          timeout: 300000 // Stage2は各動画をLLM分析するため5分に延長
-        })
+        let response: any = null
+        let retryCount = 0
+        const maxRetries = 5 // リトライ回数を増加
+        
+        // ネットワークエラー対応の強化されたリトライ機能
+        while (retryCount <= maxRetries) {
+          try {
+            showStatus(`第2段階: バッチ ${batchIndex + 1}/${totalBatches} 処理中... ${retryCount > 0 ? `(リトライ ${retryCount}回目)` : ''}`)
+            
+            response = await axios.post('/api/ai/stage2', {
+              data: batchData,
+              approved_candidates: approvedCandidates,
+              ai_engine: aiEngine,
+              batch_index: 0, // バッチデータは既に切り出し済み
+              batch_size: batchData.length
+            }, {
+              timeout: 600000, // 10分に延長（タブ非アクティブ対応）
+              headers: {
+                'Keep-Alive': 'timeout=600, max=1000',
+                'Connection': 'keep-alive'
+              }
+            })
+            break // 成功した場合はループを抜ける
+          } catch (error: any) {
+            retryCount++
+            console.log(`❌ バッチ${batchIndex + 1} 試行${retryCount}回目失敗:`, error.message)
+            
+            // ネットワークエラー、タイムアウト、IO中断の場合はリトライ
+            const isRetryableError = (
+              error.code === 'ERR_NETWORK' || 
+              error.code === 'ECONNABORTED' || 
+              error.code === 'ERR_NETWORK_IO_SUSPENDED' ||
+              error.message.includes('NETWORK_IO_SUSPENDED') ||
+              error.message.includes('timeout') ||
+              error.message.includes('net::') ||
+              error.response?.status === 0 // ネットワーク中断
+            )
+            
+            if (isRetryableError && retryCount <= maxRetries) {
+              const waitTime = Math.min(5000 * retryCount, 30000) // 指数バックオフ（最大30秒）
+              console.log(`🔄 ${waitTime/1000}秒後にリトライします... (${retryCount}/${maxRetries})`)
+              showStatus(`ネットワークエラーが発生しました。${waitTime/1000}秒後にリトライします (${retryCount}/${maxRetries})`, 'danger')
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+              continue
+            } else {
+              throw error // リトライ対象外またはリトライ上限の場合は例外を投げる
+            }
+          }
+        }
+        
+        if (!response) {
+          throw new Error(`バッチ${batchIndex + 1}の処理に${maxRetries}回失敗しました`)
+        }
         
         const batchResult = response.data
         if (batchResult.success) {
@@ -480,6 +524,16 @@ export default function Home() {
           
           console.log(`✅ バッチ ${batchIndex + 1} 完了: 成功${successCount}件, エラー${errorCount}件`)
           showStatus(`✅ バッチ ${batchIndex + 1}/${totalBatches} 完了 (処理済み: ${completedVideos}/${currentData.length}件)`)
+          
+          // 進捗を自動保存（ネットワーク中断対策）
+          localStorage.setItem('stage2_progress', JSON.stringify({
+            completed_batches: batchIndex + 1,
+            total_batches: totalBatches,
+            results: allResults,
+            total_processing_time: totalProcessingTime,
+            timestamp: new Date().toISOString()
+          }))
+          console.log(`💾 進捗保存: バッチ${batchIndex + 1}/${totalBatches}完了`)
           
           // バッチ間に少し間隔を設ける（レート制限対策）
           if (batchIndex < totalBatches - 1) {
@@ -507,6 +561,10 @@ export default function Home() {
         },
         message: `全${currentData.length}件の動画タグ付けが完了しました`
       })
+      
+      // 処理完了時に進捗データをクリア
+      localStorage.removeItem('stage2_progress')
+      console.log(`🗑️ Stage2進捗データをクリアしました`)
       
       showStatus(`✅ ${allResults.length}件の動画タグ付けが完了しました`, 'success')
       setCurrentStage(3)
