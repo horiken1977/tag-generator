@@ -117,9 +117,15 @@ class StagedTagProcessor:
             
             selected_tags = self._analyze_individual_video(video, ai_engine)
             
+            # タイトルの取得とデバッグ
+            title = video.get('title', '')
+            if not title or title.strip() == '':
+                print(f"  ⚠️ 警告: 動画 {i+1} にタイトルがありません")
+                title = f'動画{i+1}'  # フォールバックタイトル
+            
             result = {
                 'video_index': i,
-                'title': video.get('title', ''),
+                'title': title,
                 'selected_tags': selected_tags,
                 'tag_count': len(selected_tags),
                 'confidence': self._calculate_confidence(selected_tags, video)

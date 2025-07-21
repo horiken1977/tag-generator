@@ -583,12 +583,22 @@ export default function Home() {
     if (!stage2Results) return
 
     // A列: 動画タイトル, B列: タグ一覧, C列: タグ数, D列: 信頼度
-    const data = stage2Results.results.map(item => ({
-      title: item.title, // A列: 動画タイトル
-      tags: item.selected_tags.join(', '), // B列: タグ一覧
-      tag_count: item.tag_count, // C列: タグ数
-      confidence: item.confidence // D列: 信頼度
-    }))
+    const data = stage2Results.results.map((item, index) => {
+      // デバッグ用: タイトルの存在をチェック
+      if (!item.title || item.title.trim() === '') {
+        console.warn(`Row ${index}: Title is missing or empty`, item);
+      }
+      
+      return {
+        title: item.title || `動画${index + 1}`, // A列: 動画タイトル (フォールバック付き)
+        tags: item.selected_tags ? item.selected_tags.join(', ') : '', // B列: タグ一覧
+        tag_count: item.tag_count || 0, // C列: タグ数
+        confidence: item.confidence || 0 // D列: 信頼度
+      }
+    })
+    
+    // デバッグ用: CSV出力前のデータ確認
+    console.log('CSV Export Data:', data.slice(0, 3)) // 最初の3行を表示
 
     const csv = [
       ['動画タイトル', 'タグ', 'タグ数', '信頼度'], // ヘッダー行を日本語に変更

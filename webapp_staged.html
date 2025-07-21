@@ -523,20 +523,36 @@
         function exportResults() {
             if (!stage2Results) return;
             
+            // Debug: Check if titles exist in the results
+            console.log('Stage2 Results:', stage2Results);
+            console.log('First item:', stage2Results.results[0]);
+            
             // A列: 動画タイトル, B列: タグ一覧, C列: タグ数, D列: 信頼度
-            const data = stage2Results.results.map(item => ({
-                title: item.title, // A列: 動画タイトル
-                tags: item.selected_tags.join(', '), // B列: タグ一覧
-                tag_count: item.tag_count, // C列: タグ数
-                confidence: item.confidence // D列: 信頼度
-            }));
+            const data = stage2Results.results.map((item, index) => {
+                // デバッグ用: タイトルの存在をチェック
+                if (!item.title || item.title.trim() === '') {
+                    console.warn(`Row ${index}: Title is missing or empty`, item);
+                }
+                
+                return {
+                    title: item.title || `動画${index + 1}`, // A列: 動画タイトル (フォールバック付き)
+                    tags: item.selected_tags ? item.selected_tags.join(', ') : '', // B列: タグ一覧
+                    tag_count: item.tag_count || 0, // C列: タグ数
+                    confidence: item.confidence || 0 // D列: 信頼度
+                }
+            });
+            
+            // デバッグ用: CSV出力前のデータ確認
+            console.log('CSV Export Data:', data.slice(0, 3)); // 最初の3行を表示
             
             const csv = [
                 ['動画タイトル', 'タグ', 'タグ数', '信頼度'], // ヘッダー行を日本語に変更
                 ...data.map(row => [row.title, row.tags, row.tag_count, row.confidence])
-            ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\\n');
+            ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
             
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            // Add BOM for UTF-8 to ensure Excel properly displays the content
+            const bom = '\ufeff';
+            const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `tag_results_${new Date().toISOString().slice(0,10)}.csv`;
