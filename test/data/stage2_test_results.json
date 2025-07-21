@@ -1,0 +1,126 @@
+{
+  "stage": 2,
+  "success": true,
+  "results": [
+    {
+      "video_index": 0,
+      "title": "効果的なプレゼンテーション技法",
+      "selected_tags": [
+        "以下のタグを選択しました:\n\nプレゼンテーション",
+        "コミュニケーション",
+        "オーガニック検索",
+        "アイコンタクト",
+        "身振り手振り",
+        "質疑応答",
+        "構成",
+        "事例",
+        "データ",
+        "論理的な流れ",
+        "信頼関係",
+        "聴衆",
+        "注意を惹きつける",
+        "補助"
+      ],
+      "tag_count": 14,
+      "confidence": 0.78
+    },
+    {
+      "video_index": 1,
+      "title": "デジタルマーケティング基礎",
+      "selected_tags": [
+        "以下の15個のタグを選択しました:\n\nGoogle Analytics",
+        "Google Analytics 4",
+        "SEO対策",
+        "Facebook広告",
+        "Instagram広告",
+        "ペイドメディア戦略",
+        "A/Bテスト",
+        "コンバージョン率",
+        "LTV",
+        "ROI計算",
+        "SUMIFS関数",
+        "VLOOKUP関数",
+        "イベントトラッキング",
+        "カスタムイベント設定",
+        "リテンション施策"
+      ],
+      "tag_count": 15,
+      "confidence": 0.63
+    },
+    {
+      "video_index": 2,
+      "title": "Excel関数とピボットテーブル活用術",
+      "selected_tags": [
+        "以下のタグを選択しました:\n\nVLOOKUP関数",
+        "SUMIFS関数",
+        "INDEX関数",
+        "MATCH関数",
+        "ピボットテーブル",
+        "Power Query",
+        "Excel関数",
+        "データ分析",
+        "業務効率化",
+        "検索",
+        "集計",
+        "フィルタリング",
+        "外部データ連携",
+        "実践的活用",
+        "業務効率"
+      ],
+      "tag_count": 15,
+      "confidence": 0.72
+    },
+    {
+      "video_index": 3,
+      "title": "Salesforce CRM導入と運用最適化",
+      "selected_tags": [
+        "以下のタグを選択しました:\n\nSalesforce CRM",
+        "Salesforce Einstein",
+        "カスタムオブジェクト",
+        "ワークフロー設定",
+        "API連携",
+        "商談進捗管理",
+        "顧客ライフサイクル管理",
+        "成約確率",
+        "チャーン予測",
+        "CRM管理",
+        "データ分析",
+        "リード管理",
+        "予測分析"
+      ],
+      "tag_count": 13,
+      "confidence": 0.53
+    },
+    {
+      "video_index": 4,
+      "title": "Google Analytics 4とGoogle Tag Manager設定",
+      "selected_tags": [
+        "Google Analytics 4",
+        "Google Tag Manager",
+        "イベントトラッキング",
+        "カスタムイベント設定",
+        "コンバージョン率",
+        "Enhanced Ecommerce",
+        "カスタムディメンション",
+        "BigQuery",
+        "データスタジオ可視化",
+        "ペイドメディア戦略",
+        "ROI計算",
+        "チャーン予測",
+        "顧客ライフサイクル管理",
+        "成約確率",
+        "リテンション施策"
+      ],
+      "tag_count": 15,
+      "confidence": 0.53
+    }
+  ],
+  "statistics": {
+    "total_videos": 5,
+    "avg_tags_per_video": 14.4,
+    "total_tags_assigned": 72,
+    "approved_candidates_used": 47,
+    "processing_time": 16.39771
+  },
+  "message": "全動画のタグ付けが完了しました"
+}
