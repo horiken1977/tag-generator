@@ -51,7 +51,10 @@ class StagedTagProcessor:
         
         # 厳格な汎用タグフィルタリングを適用
         filtered_candidates = self._apply_strict_generic_filter(list(self.stage1_candidates))
-        self.stage1_candidates = set(filtered_candidates)
+        
+        # 類義語統一処理を適用
+        unified_candidates = self._apply_synonym_unification(filtered_candidates)
+        self.stage1_candidates = set(unified_candidates)
         
         processing_time = (datetime.now() - start_time).total_seconds()
         
@@ -324,6 +327,93 @@ class StagedTagProcessor:
         print(f"  汎用タグフィルタリング: {len(tags)}個 → {len(filtered)}個 ({removed_count}個除外)")
         return filtered
     
+    def _apply_synonym_unification(self, tags: List[str]) -> List[str]:
+        """類義語統一処理"""
+        if not tags:
+            return tags
+        
+        print("  類義語統一処理を実行中...")
+        
+        # 類義語辞書（より頻出・標準的な表記に統一）
+        synonym_groups = {
+            # Google Analytics関連
+            'Google Analytics': ['Google Analytics', 'GA', 'グーグルアナリティクス', 'Googleアナリティクス'],
+            'Google Analytics 4': ['Google Analytics 4', 'GA4', 'GA 4', 'Google Analytics4'],
+            'Google Tag Manager': ['Google Tag Manager', 'GTM', 'グーグルタグマネージャー', 'Googleタグマネージャー'],
+            
+            # Salesforce関連  
+            'Salesforce': ['Salesforce', 'SFDC', 'セールスフォース'],
+            'Salesforce CRM': ['Salesforce CRM', 'SFDC CRM', 'セールスフォースCRM'],
+            'Salesforce Einstein': ['Salesforce Einstein', 'Einstein AI', 'Einstein Analytics'],
+            
+            # 広告関連
+            'Facebook広告': ['Facebook広告', 'Facebook Ads', 'フェイスブック広告', 'Meta広告'],
+            'Instagram広告': ['Instagram広告', 'Instagram Ads', 'インスタグラム広告', 'IG広告'],
+            'Google広告': ['Google広告', 'Google Ads', 'AdWords', 'グーグル広告'],
+            
+            # Excel関連
+            'Excel関数': ['Excel関数', 'エクセル関数', 'Excel Function', 'Excel数式'],
+            'VLOOKUP関数': ['VLOOKUP関数', 'VLOOKUP', 'ブイルックアップ', 'V LOOKUP'],
+            'SUMIFS関数': ['SUMIFS関数', 'SUMIFS', 'サムイフス'],
+            'INDEX関数': ['INDEX関数', 'INDEX', 'インデックス関数'],
+            'MATCH関数': ['MATCH関数', 'MATCH', 'マッチ関数'],
+            'ピボットテーブル': ['ピボットテーブル', 'PivotTable', 'ピボット', 'クロス集計'],
+            
+            # 分析・測定関連
+            'A/Bテスト': ['A/Bテスト', 'ABテスト', 'A/B Testing', 'スプリットテスト'],
+            'ROI計算': ['ROI計算', 'ROI', '投資収益率', 'Return on Investment'],
+            'LTV': ['LTV', 'ライフタイムバリュー', '顧客生涯価値', 'Customer Lifetime Value'],
+            'コンバージョン率': ['コンバージョン率', 'CVR', 'Conversion Rate', '成約率'],
+            'CTR': ['CTR', 'クリック率', 'Click Through Rate', 'クリックスルー率'],
+            'CPA': ['CPA', '獲得単価', 'Cost Per Acquisition', 'Cost Per Action'],
+            'CPM': ['CPM', 'インプレッション単価', 'Cost Per Mille'],
+            
+            # SEO関連
+            'SEO対策': ['SEO対策', 'SEO', '検索エンジン最適化', 'Search Engine Optimization'],
+            'SEM': ['SEM', '検索エンジンマーケティング', 'Search Engine Marketing'],
+            
+            # フレームワーク・手法関連
+            'KPI': ['KPI', '重要業績評価指標', 'Key Performance Indicator', 'キーパフォーマンス指標'],
+            'OKR': ['OKR', 'Objectives and Key Results', 'オーケーアール'],
+            'PDCA': ['PDCA', 'PDCAサイクル', 'Plan-Do-Check-Act'],
+            'SWOT分析': ['SWOT分析', 'SWOT', 'スウォット分析'],
+            
+            # CRM・営業関連
+            'リード管理': ['リード管理', 'Lead Management', '見込み客管理'],
+            '商談管理': ['商談管理', 'Deal Management', 'Opportunity Management'],
+            '顧客管理': ['顧客管理', 'Customer Management', 'CRM'],
+            
+            # その他ツール
+            'Power BI': ['Power BI', 'PowerBI', 'パワーBI'],
+            'Tableau': ['Tableau', 'タブロー'],
+            'BigQuery': ['BigQuery', 'ビッグクエリ', 'Big Query']
+        }
+        
+        # 統一マッピングを作成
+        unification_map = {}
+        for standard_term, variants in synonym_groups.items():
+            for variant in variants:
+                unification_map[variant] = standard_term
+        
+        # タグを統一
+        unified_tags = []
+        unification_count = 0
+        
+        for tag in tags:
+            if tag in unification_map:
+                unified_term = unification_map[tag]
+                if unified_term not in unified_tags:
+                    unified_tags.append(unified_term)
+                    if tag != unified_term:
+                        print(f"    類義語統一: '{tag}' → '{unified_term}'")
+                        unification_count += 1
+            else:
+                if tag not in unified_tags:
+                    unified_tags.append(tag)
+        
+        print(f"  類義語統一処理: {len(tags)}個 → {len(unified_tags)}個 ({unification_count}個統一)")
+        return unified_tags
+    
     def _is_generic_word(self, word: str) -> bool:
         """汎用語チェック"""
         generic_words = {
@@ -371,16 +461,38 @@ class StagedTagProcessor:
 【承認済みタグ候補】:
 {candidates_str}
 
-【選定基準】:
-1. 文字起こし内容に直接言及されているキーワードを最優先
-2. この動画の具体的内容を最も正確に表現するタグ
-3. 検索時に実用的で具体性の高いタグ
-4. 他の動画との差別化に役立つタグ
+【選定基準（優先順位順）】:
+🎯 **最優先: 差別化と特異性**
+1. この動画でしか言及されない具体的なツール名・サービス名・手法名
+2. 文字起こしに登場する固有名詞・数値・具体的事例
+3. 他の類似動画では扱われない専門的な概念・理論
+
+🔍 **第2優先: 文字起こし直接関連性**
+4. 文字起こしで複数回言及される重要キーワード
+5. 動画の核心内容を表す専門用語
+
+⚡ **第3優先: 実用性と検索価値**
+6. 検索時に有用で具体性の高いタグ
+7. 学習者が求める実践的な知識を表すタグ
+
+【絶対に避けるべき汎用タグ（具体例）】:
+❌ 「ビジネススキル」「マーケティング」「営業」「コミュニケーション」
+❌ 「プレゼンテーション」「リーダーシップ」「マネジメント」「戦略」
+❌ 「分析」「改善」「効率化」「最適化」「向上」「強化」
+❌ 「基本」「応用」「実践」「理論」「入門」「概要」
+❌ 「スキル開発」「人材育成」「業務改善」「組織運営」
+
+【良いタグの具体例】:
+✅ 「Google Analytics 4」「Salesforce CRM」「Instagram広告」
+✅ 「ROI計算」「A/Bテスト」「コンバージョン率」「LTV分析」
+✅ 「PDCA サイクル」「OKR設定」「KPI設計」「SWOT分析」
+✅ 「Excel関数」「Power BI」「Tableau」「SQL クエリ」
 
 【厳守事項】:
 - 新しいタグは作成せず、承認済み候補からのみ選択
-- 文字起こしに関連しないタグは選択しない
-- 10-15個の範囲で選択
+- 文字起こしに全く関連しないタグは絶対に選択しない
+- 汎用的すぎるタグは差別化の観点から除外
+- 必ず15個のタグを選択（12-18個の範囲で調整可能）
 
 出力: 選択したタグのみをカンマ区切りで出力してください。
 """
@@ -404,9 +516,9 @@ class StagedTagProcessor:
                 selected.append(candidate)
         
         # 最低限の数を確保
-        if len(selected) < 10:
+        if len(selected) < 15:
             remaining_candidates = [c for c in self.approved_candidates if c not in selected]
-            for candidate in remaining_candidates[:10-len(selected)]:
+            for candidate in remaining_candidates[:15-len(selected)]:
                 selected.append(candidate)
         
         return selected[:15]
@@ -425,7 +537,7 @@ class StagedTagProcessor:
             transcript_relevance = 0.5
         
         # タグ数による信頼度
-        tag_count_factor = min(1.0, len(selected_tags) / 12.0)
+        tag_count_factor = min(1.0, len(selected_tags) / 15.0)
         
         # 総合信頼度
         confidence = (transcript_relevance * 0.7 + tag_count_factor * 0.3)
