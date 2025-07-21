@@ -523,15 +523,16 @@
         function exportResults() {
             if (!stage2Results) return;
             
+            // A列: 動画タイトル, B列: タグ一覧, C列: タグ数, D列: 信頼度
             const data = stage2Results.results.map(item => ({
-                title: item.title,
-                tags: item.selected_tags.join(', '),
-                tag_count: item.tag_count,
-                confidence: item.confidence
+                title: item.title, // A列: 動画タイトル
+                tags: item.selected_tags.join(', '), // B列: タグ一覧
+                tag_count: item.tag_count, // C列: タグ数
+                confidence: item.confidence // D列: 信頼度
             }));
             
             const csv = [
-                ['Title', 'Tags', 'Tag Count', 'Confidence'],
+                ['動画タイトル', 'タグ', 'タグ数', '信頼度'], // ヘッダー行を日本語に変更
                 ...data.map(row => [row.title, row.tags, row.tag_count, row.confidence])
             ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\\n');
             
