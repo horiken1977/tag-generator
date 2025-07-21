@@ -11,26 +11,28 @@ export async function POST(request: NextRequest) {
 
     // プレビューモードまたはURLが提供されていない場合
     if (!url || preview) {
+      const previewData = [
+        {
+          title: '効果的なプレゼンテーション技法',
+          skill: 'コミュニケーション',
+          description: '聴衆を惹きつけるプレゼンテーション技法を学ぶ',
+          summary: 'プレゼンテーションの基本構成と効果的な伝達方法',
+          transcript: 'プレゼンテーションにおいて最も重要なのは...'
+        },
+        {
+          title: 'デジタルマーケティング基礎',
+          skill: 'マーケティング',
+          description: 'SEOとSNS活用による効果的なデジタルマーケティング戦略',
+          summary: 'デジタル時代のマーケティング手法と実践方法',
+          transcript: 'デジタルマーケティングの核心は顧客との接点を...'
+        }
+      ]
+      
       return NextResponse.json({
         success: true,
-        data: [
-          {
-            title: '効果的なプレゼンテーション技法',
-            skill: 'コミュニケーション',
-            description: '聴衆を惹きつけるプレゼンテーション技法を学ぶ',
-            summary: 'プレゼンテーションの基本構成と効果的な伝達方法',
-            transcript: 'プレゼンテーションにおいて最も重要なのは...'
-          },
-          {
-            title: 'デジタルマーケティング基礎',
-            skill: 'マーケティング',
-            description: 'SEOとSNS活用による効果的なデジタルマーケティング戦略',
-            summary: 'デジタル時代のマーケティング手法と実践方法',
-            transcript: 'デジタルマーケティングの核心は顧客との接点を...'
-          }
-        ],
-        total_rows: 400,
-        processed_rows: 2
+        data: previewData,
+        total_rows: previewData.length, // 実際のデータ数に基づく
+        processed_rows: previewData.length
       })
     }
 

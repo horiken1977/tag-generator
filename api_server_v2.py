@@ -167,11 +167,28 @@ class TagGeneratorAPIHandler(http.server.SimpleHTTPRequestHandler):
                     # Parse headers
                     headers = [col.strip('"') for col in lines[0].split(',')]
                     
+                    # A列（動画タイトル）がある行のみをカウント
+                    valid_data_count = 0
+                    for i in range(1, len(lines)):  # ヘッダーを除外
+                        line = lines[i].strip()
+                        if not line:  # 空行をスキップ
+                            continue
+                        
+                        # CSV行を解析
+                        cols = [col.strip().strip('"') for col in line.split(',')]
+                        
+                        # A列（通常は最初の列）にタイトルがあるかチェック
+                        if len(cols) > 0 and cols[0].strip():
+                            # タイトルが短すぎるものや無意味なものを除外
+                            title = cols[0].strip()
+                            if len(title) > 3 and not title.lower() in ['title', 'タイトル', '動画タイトル']:
+                                valid_data_count += 1
+                    
                     self.send_json_response({
                         'success': True,
                         'message': 'Connection successful',
                         'sheet_id': sheet_id,
-                        'rows': len(lines) - 1,
+                        'rows': valid_data_count,  # A列にタイトルがある行数のみをカウント
                         'columns': headers,
                         'sample_data': lines[1] if len(lines) > 1 else None
                     })
