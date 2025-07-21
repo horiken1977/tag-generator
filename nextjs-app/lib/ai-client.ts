@@ -53,15 +53,23 @@ export class AIClient {
   async selectTagsForVideo(videoContent: string, tagCandidates: string[], engine: string = 'openai'): Promise<string[]> {
     const candidatesString = tagCandidates.join(', ')
     
+    let aiGeneratedTags: string[] = []
+    
     if (engine === 'openai') {
-      return await this.callOpenAI(`${videoContent}|||${candidatesString}`, 'select')
+      aiGeneratedTags = await this.callOpenAI(`${videoContent}|||${candidatesString}`, 'select')
     } else if (engine === 'claude') {
-      return await this.callClaude(`${videoContent}|||${candidatesString}`, 'select')
+      aiGeneratedTags = await this.callClaude(`${videoContent}|||${candidatesString}`, 'select')
     } else if (engine === 'gemini') {
-      return await this.callGemini(`${videoContent}|||${candidatesString}`, 'select')
+      aiGeneratedTags = await this.callGemini(`${videoContent}|||${candidatesString}`, 'select')
+    } else {
+      throw new Error(`Unsupported AI engine: ${engine}`)
     }
     
-    throw new Error(`Unsupported AI engine: ${engine}`)
+    // 厳格なタグ検証: Stage1候補からのみ選択
+    const validatedTags = this.validateTagsAgainstCandidates(aiGeneratedTags, tagCandidates)
+    console.log(`🔍 タグ検証: AI生成${aiGeneratedTags.length}個 → 有効${validatedTags.length}個`)
+    
+    return validatedTags
   }
   
   private async callOpenAI(content: string, promptType: 'standard' | 'light' | 'optimize' | 'select' = 'standard'): Promise<string[]> {
@@ -601,6 +609,93 @@ ${tagCandidates.join(', ')}
     ]
     
     return genericPatterns.some(pattern => pattern.test(tag))
+  }
+
+  private validateTagsAgainstCandidates(aiTags: string[], tagCandidates: string[]): string[] {
+    console.log(`🔍 タグ候補検証開始: AI生成${aiTags.length}個を検証`)
+    
+    // 承認済み候補をセットに変換（高速検索のため）
+    const approvedSet = new Set(tagCandidates)
+    
+    const validatedTags: string[] = []
+    const invalidTags: string[] = []
+    
+    for (const tag of aiTags) {
+      // 前後の空白を除去し、改行等の制御文字を除去
+      let cleanedTag = tag.trim().replace(/\n/g, '').replace(/\r/g, '')
+      
+      // プロンプトの応答形式問題を修正（「以下のタグを選択しました」等の除去）
+      if (cleanedTag.startsWith('以下の') || cleanedTag.startsWith('選択した') || cleanedTag.includes('選択しました')) {
+        continue
+      }
+      
+      // 空のタグや短すぎるタグをスキップ
+      if (!cleanedTag || cleanedTag.length < 2) {
+        continue
+      }
+      
+      // Stage1候補との完全一致チェック
+      if (approvedSet.has(cleanedTag)) {
+        if (!validatedTags.includes(cleanedTag)) { // 重複排除
+          validatedTags.push(cleanedTag)
+        }
+      } else {
+        // 部分一致チェック（類似タグの救済）
+        const partialMatch = this.findPartialMatch(cleanedTag, tagCandidates)
+        if (partialMatch) {
+          if (!validatedTags.includes(partialMatch)) {
+            validatedTags.push(partialMatch)
+            console.log(`    部分一致救済: '${cleanedTag}' → '${partialMatch}'`)
+          }
+        } else {
+          invalidTags.push(cleanedTag)
+        }
+      }
+    }
+    
+    // 検証結果のログ出力
+    console.log(`  検証結果: ${validatedTags.length}個有効、${invalidTags.length}個無効`)
+    if (invalidTags.length > 0) {
+      console.log(`  無効タグ例: ${invalidTags.slice(0, 5).join(', ')}${invalidTags.length > 5 ? '...' : ''}`)
+    }
+    
+    // 15個に満たない場合のフォールバック処理
+    if (validatedTags.length < 15) {
+      const shortage = 15 - validatedTags.length
+      const remainingCandidates = tagCandidates.filter(c => !validatedTags.includes(c))
+      
+      if (remainingCandidates.length > 0) {
+        // リストの最初から追加（一貫性のため）
+        const additionalTags = remainingCandidates.slice(0, shortage)
+        validatedTags.push(...additionalTags)
+        console.log(`  フォールバック: ${additionalTags.length}個のタグを追加して15個に調整`)
+      }
+    }
+    
+    return validatedTags.slice(0, 15) // 厳格に15個まで
+  }
+
+  private findPartialMatch(tag: string, candidates: string[]): string | null {
+    const tagLower = tag.toLowerCase()
+    
+    // 完全一致（大小文字無視）
+    for (const candidate of candidates) {
+      if (tagLower === candidate.toLowerCase()) {
+        return candidate
+      }
+    }
+    
+    // 包含関係での一致（短いタグが長いタグに含まれる場合）
+    for (const candidate of candidates) {
+      if (tagLower.includes(candidate.toLowerCase()) || candidate.toLowerCase().includes(tagLower)) {
+        // ただし、長さの差が大きすぎる場合は除外
+        if (Math.abs(tag.length - candidate.length) <= 3) {
+          return candidate
+        }
+      }
+    }
+    
+    return null
   }
   
 }

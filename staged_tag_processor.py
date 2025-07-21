@@ -414,6 +414,81 @@ class StagedTagProcessor:
         print(f"  類義語統一処理: {len(tags)}個 → {len(unified_tags)}個 ({unification_count}個統一)")
         return unified_tags
     
+    def _validate_tags_against_candidates(self, ai_tags: List[str]) -> List[str]:
+        """AI生成タグをStage1候補に対して厳格に検証"""
+        if not ai_tags or not self.approved_candidates:
+            return []
+        
+        print(f"  タグ候補検証: AI生成{len(ai_tags)}個を検証中...")
+        
+        # 承認済み候補をセットに変換（高速検索のため）
+        approved_set = set(self.approved_candidates)
+        
+        validated_tags = []
+        invalid_tags = []
+        
+        for tag in ai_tags:
+            # 前後の空白を除去し、改行等の制御文字を除去
+            cleaned_tag = tag.strip().replace('\n', '').replace('\r', '')
+            
+            # プロンプトの応答形式問題を修正（「以下のタグを選択しました」等の除去）
+            if cleaned_tag.startswith('以下の') or cleaned_tag.startswith('選択した') or '選択しました' in cleaned_tag:
+                continue
+            
+            # 空のタグや短すぎるタグをスキップ
+            if not cleaned_tag or len(cleaned_tag) < 2:
+                continue
+            
+            # Stage1候補との完全一致チェック
+            if cleaned_tag in approved_set:
+                if cleaned_tag not in validated_tags:  # 重複排除
+                    validated_tags.append(cleaned_tag)
+            else:
+                # 部分一致チェック（類似タグの救済）
+                partial_match = self._find_partial_match(cleaned_tag, approved_set)
+                if partial_match:
+                    if partial_match not in validated_tags:
+                        validated_tags.append(partial_match)
+                        print(f"    部分一致救済: '{cleaned_tag}' → '{partial_match}'")
+                else:
+                    invalid_tags.append(cleaned_tag)
+        
+        # 検証結果のログ出力
+        print(f"  検証結果: {len(validated_tags)}個有効、{len(invalid_tags)}個無効")
+        if invalid_tags:
+            print(f"  無効タグ例: {invalid_tags[:5]}{'...' if len(invalid_tags) > 5 else ''}")
+        
+        # 15個に満たない場合のフォールバック処理
+        if len(validated_tags) < 15:
+            shortage = 15 - len(validated_tags)
+            remaining_candidates = [c for c in self.approved_candidates if c not in validated_tags]
+            
+            if remaining_candidates:
+                # ランダムではなく、リストの最初から追加（一貫性のため）
+                additional_tags = remaining_candidates[:shortage]
+                validated_tags.extend(additional_tags)
+                print(f"  フォールバック: {len(additional_tags)}個のタグを追加して15個に調整")
+        
+        return validated_tags[:15]  # 厳格に15個まで
+    
+    def _find_partial_match(self, tag: str, approved_set: set) -> str:
+        """部分一致でのタグ救済"""
+        tag_lower = tag.lower()
+        
+        # 完全一致（大小文字無視）
+        for candidate in approved_set:
+            if tag_lower == candidate.lower():
+                return candidate
+        
+        # 包含関係での一致（短いタグが長いタグに含まれる場合）
+        for candidate in approved_set:
+            if tag_lower in candidate.lower() or candidate.lower() in tag_lower:
+                # ただし、長さの差が大きすぎる場合は除外
+                if abs(len(tag) - len(candidate)) <= 3:
+                    return candidate
+        
+        return None
+    
     def _is_generic_word(self, word: str) -> bool:
         """汎用語チェック"""
         generic_words = {
@@ -498,13 +573,17 @@ class StagedTagProcessor:
 """
         
         if ai_engine == 'openai':
-            return self.ai_handler.call_openai(prompt)
+            ai_tags = self.ai_handler.call_openai(prompt)
         elif ai_engine == 'claude':
-            return self.ai_handler.call_claude(prompt)
+            ai_tags = self.ai_handler.call_claude(prompt)
         elif ai_engine == 'gemini':
-            return self.ai_handler.call_gemini(prompt)
+            ai_tags = self.ai_handler.call_gemini(prompt)
         else:
-            return []
+            ai_tags = []
+        
+        # 厳格なタグ検証: Stage1候補からのみ選択
+        validated_tags = self._validate_tags_against_candidates(ai_tags)
+        return validated_tags
     
     def _fallback_individual_analysis(self, video_data: Dict[str, Any]) -> List[str]:
         """フォールバック個別分析"""
