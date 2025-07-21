@@ -4,6 +4,48 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
+// CSV解析関数: ダブルクォート内の改行を適切に処理
+function parseCSVLines(csvText: string): string[] {
+  const lines: string[] = []
+  let currentLine = ''
+  let insideQuotes = false
+  let i = 0
+  
+  while (i < csvText.length) {
+    const char = csvText[i]
+    const nextChar = csvText[i + 1]
+    
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        // エスケープされたクォート ("" -> ")
+        currentLine += '"'
+        i += 2 // 2文字分スキップ
+        continue
+      } else {
+        // クォートの開始/終了
+        insideQuotes = !insideQuotes
+        currentLine += char
+      }
+    } else if (char === '\n' && !insideQuotes) {
+      // クォート外の改行 = 行の区切り
+      lines.push(currentLine)
+      currentLine = ''
+    } else {
+      // 通常の文字またはクォート内の改行
+      currentLine += char
+    }
+    
+    i++
+  }
+  
+  // 最後の行を追加
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+  
+  return lines
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -78,12 +120,14 @@ export async function POST(request: NextRequest) {
     
     // 改行の正規化（CR、LF、CRLFに対応）
     const normalizedText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-    const lines = normalizedText.trim().split('\n').filter(line => line.trim() !== '')
     
-    console.log(`Lines after split: ${lines.length}`)
-    console.log(`First 5 lines:`, lines.slice(0, 5))
+    // 適切なCSV解析: ダブルクォート内の改行を考慮
+    const csvLines = parseCSVLines(normalizedText.trim())
     
-    if (lines.length < 2) {
+    console.log(`Properly parsed CSV lines: ${csvLines.length}`)
+    console.log(`First 3 lines:`, csvLines.slice(0, 3))
+    
+    if (csvLines.length < 2) {
       return NextResponse.json({
         success: false,
         error: 'スプレッドシートが空か、データが不十分です'
@@ -91,34 +135,34 @@ export async function POST(request: NextRequest) {
     }
 
     // CSVをパース
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+    const headers = csvLines[0].split(',').map(h => h.trim().replace(/"/g, ''))
     console.log(`Headers detected:`, headers)
     
     const data = []
 
     // デバッグ情報を追加
-    console.log(`CSVパース: ${lines.length}行を検出`)
+    console.log(`CSVパース: ${csvLines.length}行を検出`)
 
     // 厳格な行数制限（400行程度を想定）
-    const maxRows = Math.min(lines.length, 500)
+    const maxRows = Math.min(csvLines.length, 500)
     console.log(`Processing maximum ${maxRows} rows (limited for safety)`)
     
-    if (lines.length > 500) {
-      console.log(`⚠️ WARNING: CSV has ${lines.length} lines, limiting to first 500 rows`)
+    if (csvLines.length > 500) {
+      console.log(`⚠️ WARNING: CSV has ${csvLines.length} lines, limiting to first 500 rows`)
     }
 
     for (let i = 1; i < maxRows; i++) {
       // 空行をスキップ
-      if (!lines[i].trim()) continue
+      if (!csvLines[i].trim()) continue
       
       // CSVの行をより正確にパース
       const values = []
       let current = ''
       let inQuotes = false
       
-      for (let j = 0; j < lines[i].length; j++) {
-        const char = lines[i][j]
-        const nextChar = lines[i][j + 1]
+      for (let j = 0; j < csvLines[i].length; j++) {
+        const char = csvLines[i][j]
+        const nextChar = csvLines[i][j + 1]
         
         if (char === '"' && nextChar === '"') {
           current += '"'
@@ -189,7 +233,7 @@ export async function POST(request: NextRequest) {
       source: 'google_sheets',
       sheet_id: sheetId,
       debug_info: {
-        csv_lines: lines.length,
+        csv_lines: csvLines.length,
         processed_data: data.length,
         json_size_mb: (jsonString.length / 1024 / 1024).toFixed(2)
       }
